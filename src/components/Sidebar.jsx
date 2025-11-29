@@ -27,7 +27,7 @@ const Sidebar = () => {
         ))}
       </nav>
       <div className="p-4 border-t border-gray-800">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold">
             JD
           </div>
@@ -36,6 +36,12 @@ const Sidebar = () => {
             <p className="text-xs text-gray-400">Teacher</p>
           </div>
         </div>
+        <button
+          onClick={() => import('../supabaseClient').then(({ supabase }) => supabase.auth.signOut())}
+          className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors text-sm font-medium"
+        >
+          Sign Out
+        </button>
       </div>
     </div>
   );

@@ -6,6 +6,9 @@ export default function Students() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newStudent, setNewStudent] = useState({ name: '', email: '', subject: '' });
 
+    // Edit State
+    const [editingStudent, setEditingStudent] = useState(null);
+
     // Delete Modal State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [studentToDelete, setStudentToDelete] = useState(null);
@@ -26,27 +29,56 @@ export default function Students() {
         }
     };
 
-    const handleAddStudent = async () => {
+    const openAddModal = () => {
+        setEditingStudent(null);
+        setNewStudent({ name: '', email: '', subject: '' });
+        setIsModalOpen(true);
+    };
+
+    const openEditModal = (student) => {
+        setEditingStudent(student);
+        setNewStudent({ name: student.name, email: student.email, subject: student.subject });
+        setIsModalOpen(true);
+    };
+
+    const handleSaveStudent = async () => {
         if (!newStudent.name || !newStudent.email || !newStudent.subject) return;
 
-        const { error } = await supabase
-            .from('students')
-            .insert([
-                {
+        let error;
+        if (editingStudent) {
+            // Update existing student
+            const { error: updateError } = await supabase
+                .from('students')
+                .update({
                     name: newStudent.name,
                     email: newStudent.email,
                     subject: newStudent.subject,
-                    status: 'Active',
-                    last_payment: new Date()
-                }
-            ]);
+                })
+                .eq('id', editingStudent.id);
+            error = updateError;
+        } else {
+            // Insert new student
+            const { error: insertError } = await supabase
+                .from('students')
+                .insert([
+                    {
+                        name: newStudent.name,
+                        email: newStudent.email,
+                        subject: newStudent.subject,
+                        status: 'Active',
+                        last_payment: new Date()
+                    }
+                ]);
+            error = insertError;
+        }
 
         if (error) {
-            console.error('Error adding student:', error);
+            console.error('Error saving student:', error);
         } else {
             fetchStudents();
             setIsModalOpen(false);
             setNewStudent({ name: '', email: '', subject: '' });
+            setEditingStudent(null);
         }
     };
 
@@ -77,7 +109,7 @@ export default function Students() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">My Students</h1>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={openAddModal}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200"
                 >
                     Add Student
@@ -104,23 +136,29 @@ export default function Students() {
                                 </td>
                                 <td className="p-4 text-gray-700 border-b border-gray-100">{student.subject}</td>
                                 <td className="p-4 border-b border-gray-100">
-                                    <span
-                                        className={`px-2 py-1 rounded-full text-xs font-semibold ${student.status === 'Active'
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-red-100 text-red-800'
-                                            }`}
-                                    >
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${student.status === 'Active'
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-red-100 text-red-800'
+                                        }`}>
                                         {student.status}
                                     </span>
                                 </td>
                                 <td className="p-4 text-gray-700 border-b border-gray-100">{student.last_payment}</td>
                                 <td className="p-4 border-b border-gray-100">
-                                    <button
-                                        onClick={() => confirmDelete(student.id)}
-                                        className="text-red-600 hover:text-red-900 text-sm font-medium"
-                                    >
-                                        Delete
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => openEditModal(student)}
+                                            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => confirmDelete(student.id)}
+                                            className="text-red-600 hover:text-red-900 text-sm font-medium"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -128,11 +166,13 @@ export default function Students() {
                 </table>
             </div>
 
-            {/* Add Student Modal */}
+            {/* Add/Edit Student Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-lg w-96">
-                        <h2 className="text-2xl font-bold mb-6 text-gray-900">Add New Student</h2>
+                        <h2 className="text-2xl font-bold mb-6 text-gray-900">
+                            {editingStudent ? 'Edit Student' : 'Add New Student'}
+                        </h2>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -173,7 +213,7 @@ export default function Students() {
                                 Cancel
                             </button>
                             <button
-                                onClick={handleAddStudent}
+                                onClick={handleSaveStudent}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 Save
