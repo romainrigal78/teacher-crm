@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 export default function Students() {
     const [students, setStudents] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newStudent, setNewStudent] = useState({ name: '', email: '', subject: '' });
+    const [newStudent, setNewStudent] = useState({ name: '', email: '', subject: '', hourly_rate: '' });
 
     // Edit State
     const [editingStudent, setEditingStudent] = useState(null);
@@ -31,13 +31,18 @@ export default function Students() {
 
     const openAddModal = () => {
         setEditingStudent(null);
-        setNewStudent({ name: '', email: '', subject: '' });
+        setNewStudent({ name: '', email: '', subject: '', hourly_rate: '' });
         setIsModalOpen(true);
     };
 
     const openEditModal = (student) => {
         setEditingStudent(student);
-        setNewStudent({ name: student.name, email: student.email, subject: student.subject });
+        setNewStudent({
+            name: student.name,
+            email: student.email,
+            subject: student.subject,
+            hourly_rate: student.hourly_rate || ''
+        });
         setIsModalOpen(true);
     };
 
@@ -53,6 +58,7 @@ export default function Students() {
                     name: newStudent.name,
                     email: newStudent.email,
                     subject: newStudent.subject,
+                    hourly_rate: newStudent.hourly_rate || null
                 })
                 .eq('id', editingStudent.id);
             error = updateError;
@@ -65,6 +71,7 @@ export default function Students() {
                         name: newStudent.name,
                         email: newStudent.email,
                         subject: newStudent.subject,
+                        hourly_rate: newStudent.hourly_rate || null,
                         status: 'Active',
                         last_payment: new Date()
                     }
@@ -77,7 +84,7 @@ export default function Students() {
         } else {
             fetchStudents();
             setIsModalOpen(false);
-            setNewStudent({ name: '', email: '', subject: '' });
+            setNewStudent({ name: '', email: '', subject: '', hourly_rate: '' });
             setEditingStudent(null);
         }
     };
@@ -122,6 +129,7 @@ export default function Students() {
                         <tr>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Name</th>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Subject</th>
+                            <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Hourly Rate</th>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Status</th>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Last Payment</th>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Actions</th>
@@ -135,10 +143,13 @@ export default function Students() {
                                     <div className="text-xs text-gray-500">{student.email}</div>
                                 </td>
                                 <td className="p-4 text-gray-700 border-b border-gray-100">{student.subject}</td>
+                                <td className="p-4 text-gray-700 border-b border-gray-100">
+                                    {student.hourly_rate ? `${student.hourly_rate}€` : '-'}
+                                </td>
                                 <td className="p-4 border-b border-gray-100">
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${student.status === 'Active'
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-red-100 text-red-800'
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-red-100 text-red-800'
                                         }`}>
                                         {student.status}
                                     </span>
@@ -202,6 +213,16 @@ export default function Students() {
                                     onChange={(e) => setNewStudent({ ...newStudent, subject: e.target.value })}
                                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                                     placeholder="Mathematics"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Hourly Rate (€)</label>
+                                <input
+                                    type="number"
+                                    value={newStudent.hourly_rate}
+                                    onChange={(e) => setNewStudent({ ...newStudent, hourly_rate: e.target.value })}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                    placeholder="30"
                                 />
                             </div>
                         </div>

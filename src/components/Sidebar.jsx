@@ -32,8 +32,8 @@ const Sidebar = () => {
             JD
           </div>
           <div>
-            <p className="text-sm font-medium text-white">John Doe</p>
-            <p className="text-xs text-gray-400">Teacher</p>
+            <p className="text-sm font-medium text-white">Romain Rigal</p>
+            <p className="text-xs text-gray-400">Teacher (admin)</p>
           </div>
         </div>
         <button

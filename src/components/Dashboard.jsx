@@ -10,27 +10,74 @@ const StatCard = ({ title, value, color }) => (
 
 const Dashboard = () => {
     const [studentCount, setStudentCount] = useState(0);
+    const [monthlyIncome, setMonthlyIncome] = useState(0);
+    const [upcomingClasses, setUpcomingClasses] = useState([]);
 
     useEffect(() => {
-        fetchStudentCount();
+        fetchDashboardData();
     }, []);
 
-    const fetchStudentCount = async () => {
-        const { count, error } = await supabase
+    const fetchDashboardData = async () => {
+        // Fetch student count
+        const { count, error: countError } = await supabase
             .from('students')
             .select('*', { count: 'exact', head: true });
 
-        if (error) {
-            console.error('Error fetching student count:', error);
+        if (countError) {
+            console.error('Error fetching student count:', countError);
         } else {
             setStudentCount(count || 0);
+        }
+
+        // Fetch classes for current month to calculate income
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const endOfMonth = new Date();
+        endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+        endOfMonth.setDate(0);
+        endOfMonth.setHours(23, 59, 59, 999);
+
+        const { data: classes, error: classesError } = await supabase
+            .from('classes')
+            .select('*, students(hourly_rate)')
+            .gte('date', startOfMonth.toISOString())
+            .lte('date', endOfMonth.toISOString());
+
+        if (classesError) {
+            console.error('Error fetching classes:', classesError);
+        } else {
+            let total = 0;
+            classes.forEach(cls => {
+                const rate = cls.students?.hourly_rate || 30;
+                total += rate;
+            });
+            setMonthlyIncome(total);
+        }
+
+        // Fetch upcoming classes
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const { data: upcoming, error: upcomingError } = await supabase
+            .from('classes')
+            .select('*, students(name, subject)')
+            .gte('date', today.toISOString())
+            .order('date', { ascending: true })
+            .limit(5);
+
+        if (upcomingError) {
+            console.error('Error fetching upcoming classes:', upcomingError);
+        } else {
+            setUpcomingClasses(upcoming || []);
         }
     };
 
     const stats = [
         { title: 'Active Students', value: studentCount.toString(), color: 'text-blue-600' },
-        { title: 'Income this month', value: `${studentCount * 20}€`, color: 'text-green-600' },
-        { title: 'Next Class', value: '14:00', color: 'text-purple-600' },
+        { title: 'Income this month', value: `${monthlyIncome}€`, color: 'text-green-600' },
+        { title: 'Next Class', value: upcomingClasses.length > 0 ? new Date(upcomingClasses[0].date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-', color: 'text-purple-600' },
     ];
 
     return (
@@ -47,10 +94,34 @@ const Dashboard = () => {
             </div>
 
             <div className="mt-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Activity</h2>
-                <div className="text-gray-500 text-center py-8">
-                    No recent activity to show.
-                </div>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Upcoming Classes</h2>
+                {upcomingClasses.length === 0 ? (
+                    <div className="text-gray-500 text-center py-8">
+                        No upcoming classes scheduled.
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {upcomingClasses.map((cls) => (
+                            <div key={cls.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <div className="text-gray-900 font-bold">
+                                        {new Date(cls.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        <span className="mx-2">-</span>
+                                        {new Date(cls.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                    <div className="text-gray-600">
+                                        <span className="font-medium text-gray-900">{cls.students?.name}</span>
+                                        <span className="text-gray-400 mx-2">|</span>
+                                        <span className="text-sm">{cls.students?.subject}</span>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                                    Upcoming
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
