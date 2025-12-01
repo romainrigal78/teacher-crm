@@ -15,6 +15,8 @@ export default function Calendar() {
     const [classToDeleteId, setClassToDeleteId] = useState(null);
     const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
 
+    const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+
     useEffect(() => {
         fetchClasses();
         fetchStudents();
@@ -23,7 +25,7 @@ export default function Calendar() {
     const fetchClasses = async () => {
         const { data, error } = await supabase
             .from('classes')
-            .select('id, title, date');
+            .select('id, title, date, time');
 
         if (error) {
             console.error('Error fetching classes:', error);
@@ -91,6 +93,25 @@ export default function Calendar() {
         if (!selectedStudentId) return;
 
         try {
+            // Check for conflicts
+            const { data: existingClasses, error: fetchError } = await supabase
+                .from('classes')
+                .select('time')
+                .eq('date', selectedDate);
+
+            if (fetchError) throw fetchError;
+
+            const hasConflict = existingClasses.some(cls => {
+                if (!cls.time) return false;
+                // Compare times (handling potential seconds in DB time)
+                return cls.time.startsWith(selectedTime) || cls.time.slice(0, 5) === selectedTime;
+            });
+
+            if (hasConflict) {
+                setIsConflictModalOpen(true);
+                return;
+            }
+
             const student = students.find(s => s.id == selectedStudentId);
             if (!student) {
                 console.error('Student not found for ID:', selectedStudentId);
@@ -101,13 +122,11 @@ export default function Calendar() {
 
             const title = `${selectedTime} - ${student.subject} - ${student.name}`;
 
-            // Try to insert with time if column exists, otherwise just date/title
-            // Note: Ideally 'time' column should exist in DB as per plan
             const payload = {
                 title,
                 date: selectedDate,
                 student_id: selectedStudentId,
-                // time: selectedTime // Uncomment if 'time' column is confirmed
+                time: selectedTime
             };
 
             const { error } = await supabase
@@ -233,6 +252,22 @@ export default function Calendar() {
                                 Confirm
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Conflict Modal */}
+            {isConflictModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-8 rounded-xl shadow-lg w-96 text-center">
+                        <h2 className="text-xl font-bold mb-4 text-red-600">Time Slot Unavailable</h2>
+                        <p className="text-gray-600 mb-8">You already have a class scheduled at this time. Please choose another slot.</p>
+                        <button
+                            onClick={() => setIsConflictModalOpen(false)}
+                            className="px-6 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors"
+                        >
+                            OK
+                        </button>
                     </div>
                 </div>
             )}

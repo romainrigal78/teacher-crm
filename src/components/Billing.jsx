@@ -5,6 +5,8 @@ import autoTable from 'jspdf-autotable';
 
 export default function Billing() {
     const [billingData, setBillingData] = useState([]);
+    const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+    const [studentToPay, setStudentToPay] = useState(null);
 
     useEffect(() => {
         fetchUnpaidClasses();
@@ -97,13 +99,18 @@ export default function Billing() {
         }
     };
 
-    const markAsPaid = async (studentId) => {
-        if (!confirm('Are you sure you want to mark all classes for this student as paid?')) return;
+    const handleMarkAsPaidClick = (data) => {
+        setStudentToPay(data);
+        setIsPayModalOpen(true);
+    };
+
+    const confirmMarkAsPaid = async () => {
+        if (!studentToPay) return;
 
         const { error } = await supabase
             .from('classes')
             .update({ paid: true })
-            .eq('student_id', studentId)
+            .eq('student_id', studentToPay.studentId)
             .eq('paid', false);
 
         if (error) {
@@ -111,7 +118,15 @@ export default function Billing() {
             alert('Error updating records');
         } else {
             fetchUnpaidClasses();
+            setIsPayModalOpen(false);
+            setStudentToPay(null);
         }
+    };
+
+    const sendEmail = (data) => {
+        const subject = encodeURIComponent('Invoice for unpaid classes');
+        const body = encodeURIComponent(`Hi ${data.student.name},\n\nPlease find attached the invoice for your unpaid classes.\nTotal due: ${data.totalAmount}€.\n\nBest regards,`);
+        window.location.href = `mailto:${data.student.email}?subject=${subject}&body=${body}`;
     };
 
     return (
@@ -156,7 +171,13 @@ export default function Billing() {
                                                 Download Invoice
                                             </button>
                                             <button
-                                                onClick={() => markAsPaid(data.studentId)}
+                                                onClick={() => sendEmail(data)}
+                                                className="px-3 py-1 border border-green-600 text-green-600 hover:bg-green-50 rounded text-sm font-medium transition-colors"
+                                            >
+                                                Send Email
+                                            </button>
+                                            <button
+                                                onClick={() => handleMarkAsPaidClick(data)}
                                                 className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors"
                                             >
                                                 Mark as Paid
@@ -169,6 +190,34 @@ export default function Billing() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Payment Confirmation Modal */}
+            {isPayModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4 transform transition-all">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Payment</h3>
+                        <p className="text-gray-600 mb-6">
+                            Mark all unpaid classes for <span className="font-semibold text-gray-900">{studentToPay?.student.name}</span> as paid?
+                            <br />
+                            <span className="text-sm text-red-500 mt-2 block">This action cannot be undone.</span>
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsPayModalOpen(false)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmMarkAsPaid}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Confirm Payment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
