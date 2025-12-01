@@ -48,7 +48,7 @@ const Sidebar = () => {
   const initials = getInitials(displayName);
 
   return (
-    <div className="h-screen w-64 bg-gray-900 text-white flex flex-col fixed left-0 top-0 overflow-y-auto">
+    <div className="hidden md:flex h-screen w-64 bg-gray-900 text-white flex-col fixed left-0 top-0 overflow-y-auto">
       <div className="p-6 border-b border-gray-800">
         <h2 className="text-2xl font-bold text-blue-500">CRM</h2>
       </div>
@@ -58,8 +58,8 @@ const Sidebar = () => {
             key={link.name}
             to={link.href}
             className={`block px-4 py-3 rounded-lg transition-colors duration-200 ${location.pathname === link.href
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               }`}
           >
             {link.name}

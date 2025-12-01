@@ -123,7 +123,8 @@ export default function Students() {
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50">
                         <tr>
@@ -175,6 +176,52 @@ export default function Students() {
                         ))}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {students.map((student) => (
+                    <div key={student.id} className="bg-white p-4 rounded-lg shadow border border-gray-100">
+                        <div className="flex justify-between items-start mb-3">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">{student.name}</h3>
+                                <p className="text-sm text-gray-500">{student.email}</p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${student.status === 'Active'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                                }`}>
+                                {student.status}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 mb-4">
+                            <div>
+                                <span className="font-semibold block text-gray-500 text-xs">Subject</span>
+                                {student.subject}
+                            </div>
+                            <div>
+                                <span className="font-semibold block text-gray-500 text-xs">Rate</span>
+                                {student.hourly_rate ? `${student.hourly_rate}€` : '-'}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-3 border-t border-gray-100">
+                            <button
+                                onClick={() => openEditModal(student)}
+                                className="flex-1 py-2 bg-gray-50 text-blue-600 font-medium rounded hover:bg-gray-100 transition-colors"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => confirmDelete(student.id)}
+                                className="flex-1 py-2 bg-gray-50 text-red-600 font-medium rounded hover:bg-gray-100 transition-colors"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                ))}
             </div>
 
             {/* Add/Edit Student Modal */}

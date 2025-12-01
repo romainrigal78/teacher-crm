@@ -133,7 +133,8 @@ export default function Billing() {
         <div className="p-8 bg-gray-50 min-h-screen">
             <h1 className="text-3xl font-bold text-gray-900 mb-6">Billing & Invoices</h1>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50">
                         <tr>
@@ -189,6 +190,50 @@ export default function Billing() {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {billingData.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                        No unpaid classes found.
+                    </div>
+                ) : (
+                    billingData.map((data, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg shadow border border-gray-100">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">{data.student.name}</h3>
+                                    <p className="text-sm text-gray-500">{data.classes.length} Unpaid Classes</p>
+                                </div>
+                                <div className="text-xl font-bold text-green-600">
+                                    {data.totalAmount}€
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => generateInvoice(data)}
+                                    className="w-full py-2 bg-gray-50 text-gray-700 font-medium rounded hover:bg-gray-100 transition-colors"
+                                >
+                                    Download Invoice
+                                </button>
+                                <button
+                                    onClick={() => sendEmail(data)}
+                                    className="w-full py-2 border border-green-600 text-green-600 font-medium rounded hover:bg-green-50 transition-colors"
+                                >
+                                    Send Email
+                                </button>
+                                <button
+                                    onClick={() => handleMarkAsPaidClick(data)}
+                                    className="w-full py-2 bg-green-600 text-white font-medium rounded hover:bg-green-700 transition-colors"
+                                >
+                                    Mark as Paid
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* Payment Confirmation Modal */}
