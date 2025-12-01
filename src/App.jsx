@@ -8,10 +8,12 @@ import Calendar from './components/Calendar'
 import Billing from './components/Billing'
 import Settings from './components/Settings'
 import Login from './components/Login'
+import LandingPage from './components/LandingPage'
 import './App.css'
 
 function App() {
   const [session, setSession] = useState(null)
+  const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,7 +30,10 @@ function App() {
   }, [])
 
   if (!session) {
-    return <Login />
+    if (showLogin) {
+      return <Login onBackToHome={() => setShowLogin(false)} />
+    }
+    return <LandingPage onSignInClick={() => setShowLogin(true)} />
   }
 
   return (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
-export default function Login() {
+export default function Login({ onBackToHome }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -73,6 +73,16 @@ export default function Login() {
                             className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition-colors duration-200 disabled:opacity-50"
                         >
                             Sign Up
+                        </button>
+                    </div>
+
+                    <div className="mt-6 text-center">
+                        <button
+                            type="button"
+                            onClick={onBackToHome}
+                            className="text-sm text-gray-500 hover:text-gray-700 hover:underline transition-colors"
+                        >
+                            ← Back to Home
                         </button>
                     </div>
                 </form>
