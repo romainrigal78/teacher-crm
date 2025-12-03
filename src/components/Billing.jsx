@@ -130,12 +130,12 @@ export default function Billing() {
     };
 
     return (
-        <div className="p-8 bg-gray-50 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">Billing & Invoices</h1>
+        <div className="container mx-auto p-4">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Billing & Invoices</h1>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-left border-collapse">
+            {/* VIEW 1: DESKTOP TABLE (Hidden on Mobile) */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+                <table className="min-w-full text-left border-collapse">
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Student Name</th>
@@ -192,18 +192,18 @@ export default function Billing() {
                 </table>
             </div>
 
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
+            {/* VIEW 2: MOBILE CARDS (Visible ONLY on Mobile) */}
+            <div className="md:hidden flex flex-col gap-4">
                 {billingData.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
                         No unpaid classes found.
                     </div>
                 ) : (
                     billingData.map((data, index) => (
-                        <div key={index} className="bg-white p-4 rounded-lg shadow border border-gray-100">
+                        <div key={index} className="bg-white p-4 rounded-lg shadow border border-gray-200">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900">{data.student.name}</h3>
+                                    <h3 className="font-bold text-lg text-gray-900">{data.student.name}</h3>
                                     <p className="text-sm text-gray-500">{data.classes.length} Unpaid Classes</p>
                                 </div>
                                 <div className="text-xl font-bold text-green-600">

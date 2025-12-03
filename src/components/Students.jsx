@@ -112,9 +112,10 @@ export default function Students() {
     };
 
     return (
-        <div className="p-8 bg-gray-50 min-h-screen relative">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">My Students</h1>
+        <div className="container mx-auto p-4">
+            {/* Header & Add Button */}
+            <div className="flex justify-between items-center mb-4">
+                <h1 className="text-2xl font-bold text-gray-900">My Students</h1>
                 <button
                     onClick={openAddModal}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200"
@@ -123,9 +124,9 @@ export default function Students() {
                 </button>
             </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-left border-collapse">
+            {/* VIEW 1: DESKTOP TABLE (Hidden on Mobile) */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+                <table className="min-w-full text-left border-collapse">
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="p-4 text-sm font-semibold text-gray-600 border-b border-gray-200">Name</th>
@@ -159,6 +160,12 @@ export default function Students() {
                                 <td className="p-4 border-b border-gray-100">
                                     <div className="flex gap-2">
                                         <button
+                                            onClick={() => alert(`Send this link to your student: ${window.location.origin}\n\nTell them to sign up with their email: ${student.email}.\n\nThe system will link them automatically.`)}
+                                            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                        >
+                                            Invite
+                                        </button>
+                                        <button
                                             onClick={() => openEditModal(student)}
                                             className="text-blue-600 hover:text-blue-900 text-sm font-medium"
                                         >
@@ -178,50 +185,35 @@ export default function Students() {
                 </table>
             </div>
 
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
+            {/* VIEW 2: MOBILE CARDS (Visible ONLY on Mobile) */}
+            <div className="md:hidden flex flex-col gap-4">
                 {students.map((student) => (
-                    <div key={student.id} className="bg-white p-4 rounded-lg shadow border border-gray-100">
-                        <div className="flex justify-between items-start mb-3">
+                    <div key={student.id} className="bg-white p-4 rounded-lg shadow border border-gray-200">
+                        <div className="flex justify-between items-start mb-2">
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900">{student.name}</h3>
-                                <p className="text-sm text-gray-500">{student.email}</p>
+                                <h3 className="font-bold text-lg text-gray-900">{student.name}</h3>
+                                <p className="text-gray-500 text-sm">{student.subject}</p>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${student.status === 'Active'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                                }`}>
+                            {/* Status Badge */}
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${student.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {student.status}
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 mb-4">
-                            <div>
-                                <span className="font-semibold block text-gray-500 text-xs">Subject</span>
-                                {student.subject}
-                            </div>
-                            <div>
-                                <span className="font-semibold block text-gray-500 text-xs">Rate</span>
-                                {student.hourly_rate ? `${student.hourly_rate}€` : '-'}
-                            </div>
+                        <div className="text-sm text-gray-600 mb-4">
+                            <p>Rate: {student.hourly_rate ? `${student.hourly_rate}€/h` : '-'}</p>
+                            <p className="text-xs text-gray-400 mt-1">{student.email}</p>
                         </div>
-
-                        <div className="flex gap-3 pt-3 border-t border-gray-100">
-                            <button
-                                onClick={() => openEditModal(student)}
-                                className="flex-1 py-2 bg-gray-50 text-blue-600 font-medium rounded hover:bg-gray-100 transition-colors"
-                            >
-                                Edit
-                            </button>
-                            <button
-                                onClick={() => confirmDelete(student.id)}
-                                className="flex-1 py-2 bg-gray-50 text-red-600 font-medium rounded hover:bg-gray-100 transition-colors"
-                            >
-                                Delete
-                            </button>
+                        {/* Action Buttons (Full Width) */}
+                        <div className="flex gap-2">
+                            <button onClick={() => alert(`Send this link to your student: ${window.location.origin}\n\nTell them to sign up with their email: ${student.email}.\n\nThe system will link them automatically.`)} className="flex-1 bg-blue-50 text-blue-600 py-2 rounded hover:bg-blue-100 transition-colors">Invite</button>
+                            <button onClick={() => openEditModal(student)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 transition-colors">Edit</button>
+                            <button onClick={() => confirmDelete(student.id)} className="flex-1 bg-red-50 text-red-600 py-2 rounded hover:bg-red-100 transition-colors">Delete</button>
                         </div>
                     </div>
                 ))}
+
+                {students.length === 0 && <p className="text-center text-gray-500">No students found.</p>}
             </div>
 
             {/* Add/Edit Student Modal */}
