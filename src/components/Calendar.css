@@ -1,0 +1,106 @@
+/* Calendar.css */
+.fc {
+    font-family: inherit;
+    --fc-border-color: #e5e7eb;
+    --fc-button-text-color: #fff;
+    --fc-button-bg-color: #2563eb;
+    --fc-button-border-color: #2563eb;
+    --fc-button-hover-bg-color: #1d4ed8;
+    --fc-button-hover-border-color: #1d4ed8;
+    --fc-button-active-bg-color: #1e40af;
+    --fc-button-active-border-color: #1e40af;
+    --fc-event-bg-color: #3b82f6;
+    --fc-event-border-color: #3b82f6;
+    --fc-today-bg-color: #eff6ff;
+}
+
+.dark .fc {
+    --fc-border-color: #374151;
+    --fc-today-bg-color: rgba(59, 130, 246, 0.1);
+    --fc-page-bg-color: #1f2937;
+    --fc-neutral-bg-color: #374151;
+    --fc-list-event-hover-bg-color: #374151;
+}
+
+.fc .fc-toolbar-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.dark .fc .fc-toolbar-title {
+    color: #f3f4f6;
+}
+
+.fc .fc-button {
+    border-radius: 0.5rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    text-transform: capitalize;
+    transition: all 0.2s;
+}
+
+.fc .fc-button:focus {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.5);
+}
+
+.fc .fc-col-header-cell-cushion {
+    padding: 12px 0;
+    font-weight: 600;
+    color: #4b5563;
+}
+
+.dark .fc .fc-col-header-cell-cushion {
+    color: #9ca3af;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+    border-color: var(--fc-border-color);
+}
+
+.fc .fc-daygrid-day-number {
+    padding: 8px;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.dark .fc .fc-daygrid-day-number {
+    color: #9ca3af;
+}
+
+.fc-event {
+    border-radius: 6px;
+    padding: 2px 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: none;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.fc-h-event {
+    background-color: var(--fc-event-bg-color);
+}
+
+.fc-daygrid-event-dot {
+    border-color: var(--fc-event-bg-color);
+}
+
+/* Remove default scrollbar styles if needed */
+.fc-scroller::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.fc-scroller::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fc-scroller::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 4px;
+}
+
+.dark .fc-scroller::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+}

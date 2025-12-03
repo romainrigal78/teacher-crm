@@ -22,6 +22,7 @@ function App() {
       setSession(session)
       if (session) {
         checkUserRole(session.user.id)
+        checkTheme(session.user.id)
       } else {
         setUserRole('teacher') // Or null, but we want to stop loading
       }
@@ -34,6 +35,7 @@ function App() {
       if (session) {
         setUserRole('loading')
         checkUserRole(session.user.id)
+        checkTheme(session.user.id)
       } else {
         setUserRole('teacher')
       }
@@ -42,6 +44,31 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  const checkTheme = async (userId) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('theme')
+        .eq('id', userId)
+        .single()
+
+      if (data?.theme === 'Dark') {
+        document.documentElement.classList.add('dark')
+      } else if (data?.theme === 'Light') {
+        document.documentElement.classList.remove('dark')
+      } else {
+        // System preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark')
+        } else {
+          document.documentElement.classList.remove('dark')
+        }
+      }
+    } catch (error) {
+      console.error('Error checking theme:', error)
+    }
+  }
+
   const checkUserRole = async (userId) => {
     try {
       // Check if this user is linked to a student record
@@ -49,7 +76,7 @@ function App() {
         .from('students')
         .select('id')
         .eq('auth_user_id', userId)
-        .single()
+        .maybeSingle()
 
       if (data) {
         setUserRole('student')
