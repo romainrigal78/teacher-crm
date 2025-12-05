@@ -8,7 +8,6 @@ import Calendar from './components/Calendar'
 import Billing from './components/Billing'
 import Settings from './components/Settings'
 import Login from './components/Login'
-import LandingPage from './components/LandingPage'
 import StudentDashboard from './components/StudentDashboard'
 import Marketplace from './components/Marketplace'
 import Paywall from './components/Paywall'
@@ -18,7 +17,6 @@ import './App.css'
 
 function App() {
   const [session, setSession] = useState(null)
-  const [showLogin, setShowLogin] = useState(false)
   const [userRole, setUserRole] = useState('loading') // 'teacher' | 'student' | 'loading'
   const [userAvatarUrl, setUserAvatarUrl] = useState(null)
 
@@ -133,21 +131,14 @@ function App() {
     return <div className="flex items-center justify-center h-screen text-gray-500">Loading...</div>
   }
 
-  // 2. No Session -> Landing Page / Login / Marketplace
+  // 2. No Session -> Login / Marketplace
   if (!session) {
-    if (showLogin) {
-      return <Login onBackToHome={() => setShowLogin(false)} />
-    }
-    // We need to handle routing here for public pages if we want /search to work without login
-    // But currently App structure returns early.
-    // Let's wrap the public view in a Router to allow /search access.
-
     return (
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LandingPage onSignInClick={() => setShowLogin(true)} />} />
+          <Route path="/" element={<Login />} />
           <Route path="/search" element={<Marketplace />} />
-          <Route path="*" element={<LandingPage onSignInClick={() => setShowLogin(true)} />} />
+          <Route path="*" element={<Login />} />
         </Routes>
       </BrowserRouter>
     )

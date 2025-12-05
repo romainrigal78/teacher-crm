@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Plus, Calendar, Save, Check, Search, FileText, BookOpen, Trash2, Edit2, X } from 'lucide-react';
@@ -11,9 +10,8 @@ const Grades = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [subjects, setSubjects] = useState([]);
+    const [deleteConfirmation, setDeleteConfirmation] = useState(null);
     const [editingId, setEditingId] = useState(null);
-
-    // New Assessment Form
     const [newAssessment, setNewAssessment] = useState({
         title: '',
         date: new Date().toISOString().split('T')[0],
@@ -33,6 +31,24 @@ const Grades = () => {
         }
     }, [selectedAssessment]);
 
+    const fetchSubjects = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('subjects')
+                .select('name')
+                .eq('user_id', user.id)
+                .order('name');
+
+            if (error) throw error;
+            setSubjects(data.map(s => s.name));
+        } catch (error) {
+            console.error('Error fetching subjects:', error);
+        }
+    };
+
     const fetchAssessments = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -45,7 +61,7 @@ const Grades = () => {
                 .order('date', { ascending: false });
 
             if (error) throw error;
-            setAssessments(data || []);
+            setAssessments(data);
         } catch (error) {
             console.error('Error fetching assessments:', error);
         } finally {
@@ -55,47 +71,19 @@ const Grades = () => {
 
     const fetchStudents = async () => {
         try {
-            const { data, error } = await supabase
-                .from('students')
-                .select('id, name, subject')
-                .order('name');
-
-            if (error) throw error;
-            setStudents(data || []);
-        } catch (error) {
-            console.error('Error fetching students:', error);
-        }
-    };
-
-    const fetchSubjects = async () => {
-        try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Fetch custom subjects
-            const { data: customSubjects, error: customError } = await supabase
-                .from('subjects')
-                .select('name')
-                .eq('user_id', user.id);
+            const { data, error } = await supabase
+                .from('students')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('name');
 
-            if (customError) throw customError;
-
-            // Fetch profile subject (legacy)
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('subject')
-                .eq('id', user.id)
-                .single();
-
-            if (profileError) throw profileError;
-
-            const allSubjects = new Set();
-            if (profile?.subject) allSubjects.add(profile.subject);
-            customSubjects?.forEach(s => allSubjects.add(s.name));
-
-            setSubjects(Array.from(allSubjects));
+            if (error) throw error;
+            setStudents(data);
         } catch (error) {
-            console.error('Error fetching subjects:', error);
+            console.error('Error fetching students:', error);
         }
     };
 
@@ -109,10 +97,10 @@ const Grades = () => {
             if (error) throw error;
 
             const gradesMap = {};
-            data.forEach(g => {
-                gradesMap[g.student_id] = {
-                    score: g.score,
-                    feedback: g.feedback,
+            data.forEach(grade => {
+                gradesMap[grade.student_id] = {
+                    score: grade.score,
+                    feedback: grade.feedback,
                     status: 'saved'
                 };
             });
@@ -126,27 +114,30 @@ const Grades = () => {
         e.preventDefault();
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
 
             if (editingId) {
-                // Update
-                const { data, error } = await supabase
+                const { error } = await supabase
                     .from('assessments')
                     .update({
                         title: newAssessment.title,
                         date: newAssessment.date,
                         max_score: newAssessment.max_score,
-                        subject: newAssessment.subject
+                        subject: newAssessment.subject || null
                     })
-                    .eq('id', editingId)
-                    .select()
-                    .single();
+                    .eq('id', editingId);
 
                 if (error) throw error;
 
-                setAssessments(assessments.map(a => a.id === editingId ? data : a));
-                if (selectedAssessment?.id === editingId) setSelectedAssessment(data);
+                setAssessments(assessments.map(a =>
+                    a.id === editingId
+                        ? { ...a, ...newAssessment, subject: newAssessment.subject || null }
+                        : a
+                ));
+                if (selectedAssessment?.id === editingId) {
+                    setSelectedAssessment({ ...selectedAssessment, ...newAssessment, subject: newAssessment.subject || null });
+                }
             } else {
-                // Create
                 const { data, error } = await supabase
                     .from('assessments')
                     .insert([{
@@ -154,40 +145,43 @@ const Grades = () => {
                         title: newAssessment.title,
                         date: newAssessment.date,
                         max_score: newAssessment.max_score,
-                        subject: newAssessment.subject
+                        subject: newAssessment.subject || null
                     }])
-                    .select()
-                    .single();
+                    .select();
 
                 if (error) throw error;
-
-                setAssessments([data, ...assessments]);
-                setSelectedAssessment(data);
+                setAssessments([data[0], ...assessments]);
             }
 
             setIsModalOpen(false);
-            setNewAssessment({ title: '', date: new Date().toISOString().split('T')[0], max_score: 20, subject: '' });
             setEditingId(null);
+            setNewAssessment({ title: '', date: new Date().toISOString().split('T')[0], max_score: 20, subject: '' });
         } catch (error) {
             console.error('Error saving assessment:', error);
             alert('Failed to save assessment');
         }
     };
 
-    const handleDeleteAssessment = async (e, id) => {
+    const handleDeleteAssessment = (e, assessmentId) => {
         e.stopPropagation();
-        if (!window.confirm('Are you sure you want to delete this assessment? All grades associated with it will be lost.')) return;
+        const assessment = assessments.find(a => a.id === assessmentId);
+        setDeleteConfirmation(assessment);
+    };
+
+    const confirmDeleteAssessment = async () => {
+        if (!deleteConfirmation) return;
 
         try {
             const { error } = await supabase
                 .from('assessments')
                 .delete()
-                .eq('id', id);
+                .eq('id', deleteConfirmation.id);
 
             if (error) throw error;
 
-            setAssessments(assessments.filter(a => a.id !== id));
-            if (selectedAssessment?.id === id) setSelectedAssessment(null);
+            setAssessments(assessments.filter(a => a.id !== deleteConfirmation.id));
+            if (selectedAssessment?.id === deleteConfirmation.id) setSelectedAssessment(null);
+            setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting assessment:', error);
             alert('Failed to delete assessment');
@@ -543,6 +537,35 @@ const Grades = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmation && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm w-full border border-gray-100 dark:border-gray-700 text-center">
+                        <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
+                            <Trash2 size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Delete Assessment?</h3>
+                        <p className="text-gray-500 dark:text-gray-400 mb-6">
+                            Are you sure you want to delete <strong>{deleteConfirmation.title}</strong>? All grades associated with it will be lost.
+                        </p>
+                        <div className="flex justify-center gap-3">
+                            <button
+                                onClick={() => setDeleteConfirmation(null)}
+                                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteAssessment}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                            >
+                                Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
