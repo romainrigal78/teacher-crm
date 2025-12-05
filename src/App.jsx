@@ -8,6 +8,7 @@ import Calendar from './components/Calendar'
 import Billing from './components/Billing'
 import Settings from './components/Settings'
 import Login from './components/Login'
+import LandingPage from './components/LandingPage'
 import StudentDashboard from './components/StudentDashboard'
 import Marketplace from './components/Marketplace'
 import Paywall from './components/Paywall'
@@ -19,6 +20,7 @@ function App() {
   const [session, setSession] = useState(null)
   const [userRole, setUserRole] = useState('loading') // 'teacher' | 'student' | 'loading'
   const [userAvatarUrl, setUserAvatarUrl] = useState(null)
+  const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
     // 0. Immediate Theme Check (Local Storage)
@@ -68,7 +70,6 @@ function App() {
         .from('profiles')
         .select('avatar_url')
         .eq('id', userId)
-        .eq('id', userId)
         .maybeSingle()
 
       if (data) {
@@ -84,7 +85,6 @@ function App() {
       const { data } = await supabase
         .from('profiles')
         .select('theme')
-        .eq('id', userId)
         .eq('id', userId)
         .maybeSingle()
 
@@ -131,14 +131,18 @@ function App() {
     return <div className="flex items-center justify-center h-screen text-gray-500">Loading...</div>
   }
 
-  // 2. No Session -> Login / Marketplace
+  // 2. No Session -> Landing Page / Login / Marketplace
   if (!session) {
+    if (showLogin) {
+      return <Login onBackToHome={() => setShowLogin(false)} />
+    }
+
     return (
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<LandingPage onSignInClick={() => setShowLogin(true)} />} />
           <Route path="/search" element={<Marketplace />} />
-          <Route path="*" element={<Login />} />
+          <Route path="*" element={<LandingPage onSignInClick={() => setShowLogin(true)} />} />
         </Routes>
       </BrowserRouter>
     )
