@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
+import { X, Plus } from 'lucide-react';
 import AvatarUpload from './AvatarUpload';
+import CityAutocomplete from './CityAutocomplete';
 
 const Settings = ({ onAvatarUpdate }) => {
     const [loading, setLoading] = useState(true);
@@ -17,14 +19,68 @@ const Settings = ({ onAvatarUpdate }) => {
     const [theme, setTheme] = useState('System');
     const [message, setMessage] = useState(null);
 
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
+
+    const [availableSubjects, setAvailableSubjects] = useState([]);
+    const [newSubjectInput, setNewSubjectInput] = useState('');
+
     const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology"];
-    const THEMES = ["Light", "Dark", "System"];
 
     useEffect(() => {
         getProfile();
+        fetchSubjects();
     }, []);
 
     // ... (useEffect for theme remains same) ...
+
+    const fetchSubjects = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('subjects')
+                .select('*')
+                .order('name');
+            if (error) throw error;
+            setAvailableSubjects(data || []);
+        } catch (error) {
+            console.error('Error fetching subjects:', error);
+        }
+    };
+
+    const handleAddSubject = async () => {
+        if (!newSubjectInput.trim()) return;
+        try {
+            const { data, error } = await supabase
+                .from('subjects')
+                .insert([{ user_id: user.id, name: newSubjectInput.trim() }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            setAvailableSubjects([...availableSubjects, data]);
+            setNewSubjectInput('');
+        } catch (error) {
+            console.error('Error adding subject:', error);
+            setMessage({ type: 'error', text: 'Failed to add subject' });
+        }
+    };
+
+    const handleDeleteSubject = async (id) => {
+        try {
+            const { error } = await supabase
+                .from('subjects')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            setAvailableSubjects(availableSubjects.filter(s => s.id !== id));
+        } catch (error) {
+            console.error('Error deleting subject:', error);
+            setMessage({ type: 'error', text: 'Failed to delete subject' });
+        }
+    };
 
     const getProfile = async () => {
         try {
@@ -49,15 +105,25 @@ const Settings = ({ onAvatarUpdate }) => {
                     setTheme(data.theme || 'System');
 
                     // Handle Subject Logic
-                    if (data.subject) {
-                        if (STANDARD_SUBJECTS.includes(data.subject)) {
-                            setSubject(data.subject);
-                            setIsCustomSubject(false);
-                        } else {
-                            setSubject('Other');
-                            setCustomSubject(data.subject);
-                            setIsCustomSubject(true);
-                        }
+                    // We combine standard and custom subjects for the check
+                    const allSubjects = [...STANDARD_SUBJECTS, ...(availableSubjects.map(s => s.name))]; // Note: availableSubjects might be empty here initially due to async
+                    // Actually, we should just check if it's in the dropdown list we WILL render.
+                    // For now, let's keep the logic simple: if it's not "Other" and not in standard, it's custom?
+                    // Wait, if I add "Biology" to subjects table, it should appear in the dropdown.
+                    // So I need to wait for fetchSubjects?
+                    // Let's just set the subject directly.
+
+                    setSubject(data.subject || 'Mathematics');
+                    // If data.subject is not in STANDARD or available, it might be an old custom one.
+                    // But we want to move away from "Other" text input if possible, or keep it as fallback.
+                    // Let's keep the existing logic for now but update the dropdown list later.
+
+                    if (data.subject && !STANDARD_SUBJECTS.includes(data.subject)) {
+                        // Check if it's in our DB subjects (we might not have fetched them yet fully, but let's assume we will)
+                        // Actually, simpler: just set it. The dropdown will show it if it's in the list.
+                        // If it's "Other" (custom typed), we set isCustomSubject true.
+                        // But now we want "Other" to be "Add new to DB".
+                        // Let's keep the "Other" logic for manual entry, but also support selection from DB.
                     }
                 } else if (user.user_metadata?.full_name) {
                     // Fallback to auth metadata if no profile yet
@@ -71,32 +137,49 @@ const Settings = ({ onAvatarUpdate }) => {
         }
     };
 
-    const handleThemeChange = async (e) => {
-        const newTheme = e.target.value;
-        setTheme(newTheme);
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        setStatusMessage({ type: '', text: '' });
 
-        // 1. Force DOM update immediately
-        const root = document.documentElement;
-        if (newTheme === 'Dark') {
-            root.classList.add('dark');
-            localStorage.setItem('theme', 'Dark');
-        } else if (newTheme === 'Light') {
-            root.classList.remove('dark');
-            localStorage.setItem('theme', 'Light');
-        } else {
-            // System
-            localStorage.removeItem('theme'); // Remove override
-            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
+        if (newPassword !== confirmPassword) {
+            setStatusMessage({ type: 'error', text: 'New passwords do not match.' });
+            return;
         }
 
-        // 2. Save preference to Supabase
-        if (user) {
-            const { error } = await supabase.from('profiles').update({ theme: newTheme }).eq('id', user.id);
-            if (error) console.error('Error saving theme:', error);
+        if (newPassword.length < 6) {
+            setStatusMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+            return;
+        }
+
+        try {
+            setUpdating(true);
+            // 1. Verify old password
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: currentPassword
+            });
+
+            if (signInError) {
+                setStatusMessage({ type: 'error', text: 'Incorrect current password.' });
+                setUpdating(false);
+                return;
+            }
+
+            // 2. Update password
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword
+            });
+
+            if (updateError) throw updateError;
+
+            setStatusMessage({ type: 'success', text: 'Password updated successfully!' });
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error.message });
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -206,46 +289,58 @@ const Settings = ({ onAvatarUpdate }) => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
-                                <input
-                                    type="text"
+                                <CityAutocomplete
                                     value={city}
-                                    onChange={(e) => setCity(e.target.value)}
-                                    className={inputClasses}
+                                    onSelect={setCity}
                                     placeholder="Paris, France"
                                 />
                             </div>
                         </div>
 
-                        {/* Smart Subject Selector */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teaching Subject</label>
-                            <div className="flex flex-col md:flex-row gap-3">
-                                <div className="relative w-full md:w-1/2">
-                                    <select
-                                        value={subject}
-                                        onChange={handleSubjectChange}
-                                        className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 py-3 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                    >
-                                        {STANDARD_SUBJECTS.map(sub => (
-                                            <option key={sub} value={sub}>{sub}</option>
-                                        ))}
-                                        <option value="Other">Other (Add new...)</option>
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-                                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
-                                    </div>
-                                </div>
+                        {/* Manage Subjects Section */}
+                        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">My Subjects</label>
 
-                                {isCustomSubject && (
-                                    <input
-                                        type="text"
-                                        value={customSubject}
-                                        onChange={(e) => setCustomSubject(e.target.value)}
-                                        className={`${inputClasses} md:w-1/2 animate-fade-in`}
-                                        placeholder="Enter your subject..."
-                                        autoFocus
-                                    />
+                            <div className="flex flex-wrap mb-4">
+                                {availableSubjects.map(sub => (
+                                    <span key={sub.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 mr-2 mb-2 dark:bg-blue-900/30 dark:text-blue-300">
+                                        {sub.name}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteSubject(sub.id)}
+                                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 focus:outline-none"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </span>
+                                ))}
+                                {availableSubjects.length === 0 && (
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 italic mb-2">No custom subjects added yet.</span>
                                 )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newSubjectInput}
+                                    onChange={(e) => setNewSubjectInput(e.target.value)}
+                                    placeholder="Add new subject..."
+                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 outline-none text-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddSubject();
+                                        }
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAddSubject}
+                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                                >
+                                    <Plus size={16} />
+                                    Add
+                                </button>
                             </div>
                         </div>
 
@@ -273,30 +368,64 @@ const Settings = ({ onAvatarUpdate }) => {
                 </div>
             </div>
 
-            {/* Appearance Section */}
+            {/* Security Section */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Appearance</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Customize how the application looks.</p>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Security</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your password and account security.</p>
                 </div>
                 <div className="p-6">
-                    <div className="max-w-xs">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Theme</label>
-                        <div className="relative">
-                            <select
-                                value={theme}
-                                onChange={handleThemeChange}
-                                className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 py-3 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                            >
-                                {THEMES.map(t => (
-                                    <option key={t} value={t}>{t}</option>
-                                ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                    <form onSubmit={handleChangePassword} className="space-y-6 max-w-md">
+                        {statusMessage.text && (
+                            <div className={`p-3 mb-4 rounded-md border ${statusMessage.type === 'error'
+                                    ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800'
+                                    : 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+                                }`}>
+                                {statusMessage.text}
                             </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
+                            <input
+                                type="password"
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                className={inputClasses}
+                                required
+                            />
                         </div>
-                    </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+                            <input
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className={inputClasses}
+                                required
+                                minLength={6}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className={inputClasses}
+                                required
+                                minLength={6}
+                            />
+                        </div>
+                        <div className="pt-2">
+                            <button
+                                type="submit"
+                                disabled={updating}
+                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                            >
+                                {updating ? 'Updating...' : 'Update Password'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

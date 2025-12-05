@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Search, MapPin, Mail, BookOpen, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import CityAutocomplete from './CityAutocomplete';
 
 export default function Marketplace() {
     const [profiles, setProfiles] = useState([]);
@@ -18,12 +19,39 @@ export default function Marketplace() {
     const fetchProfiles = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            // Fetch Profiles
+            const { data: profilesData, error: profilesError } = await supabase
                 .from('profiles')
                 .select('*');
 
-            if (error) throw error;
-            setProfiles(data || []);
+            if (profilesError) throw profilesError;
+
+            // Fetch Subjects
+            const { data: subjectsData, error: subjectsError } = await supabase
+                .from('subjects')
+                .select('*');
+
+            if (subjectsError) throw subjectsError;
+
+            // Map subjects to profiles
+            const profilesWithSubjects = (profilesData || []).map(profile => {
+                const userSubjects = (subjectsData || []).filter(s => s.user_id === profile.id);
+                // Combine legacy single subject with new subjects table
+                const allSubjects = [];
+                if (profile.subject) allSubjects.push(profile.subject);
+                userSubjects.forEach(s => allSubjects.push(s.name));
+
+                // Deduplicate
+                const uniqueSubjects = [...new Set(allSubjects)];
+
+                return {
+                    ...profile,
+                    subjects: uniqueSubjects
+                };
+            });
+
+            setProfiles(profilesWithSubjects);
         } catch (error) {
             console.error('Error fetching profiles:', error);
         } finally {
@@ -32,8 +60,14 @@ export default function Marketplace() {
     };
 
     const filteredProfiles = profiles.filter(profile => {
-        const matchesSubject = subjectFilter ? profile.subject === subjectFilter : true;
-        const matchesCity = cityFilter ? (profile.city || '').toLowerCase().includes(cityFilter.toLowerCase()) : true;
+        const matchesSubject = subjectFilter
+            ? profile.subjects.some(s => s.toLowerCase().includes(subjectFilter.toLowerCase()))
+            : true;
+
+        const matchesCity = cityFilter
+            ? (profile.city || '').toLowerCase().includes(cityFilter.toLowerCase())
+            : true;
+
         return matchesSubject && matchesCity;
     });
 
@@ -60,25 +94,24 @@ export default function Marketplace() {
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg flex flex-col md:flex-row gap-4 transition-colors duration-300">
                         <div className="flex-1 relative">
                             <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                            <select
-                                value={subjectFilter}
-                                onChange={(e) => setSubjectFilter(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none transition-colors duration-300"
-                            >
-                                <option value="">All Subjects</option>
-                                {STANDARD_SUBJECTS.map(sub => (
-                                    <option key={sub} value={sub}>{sub}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex-1 relative">
-                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                             <input
                                 type="text"
-                                placeholder="City (e.g. Paris)"
-                                value={cityFilter}
-                                onChange={(e) => setCityFilter(e.target.value)}
+                                value={subjectFilter}
+                                onChange={(e) => setSubjectFilter(e.target.value)}
+                                placeholder="Subject (e.g. Math)"
                                 className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors duration-300"
+                            />
+                        </div>
+                        <div className="flex-1 relative">
+                            {/* MapPin icon is handled inside CityAutocomplete now, or we can keep it if we want consistent styling with the select box. 
+                                The CityAutocomplete has its own icon. Let's use it directly but we might need to adjust styling to match the select box next to it.
+                                The CityAutocomplete uses standard input styling. The select box uses specific styling.
+                                Let's try to make them look similar.
+                            */}
+                            <CityAutocomplete
+                                value={cityFilter}
+                                onSelect={setCityFilter}
+                                placeholder="City (e.g. Paris)"
                             />
                         </div>
                         <button className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
@@ -127,11 +160,18 @@ export default function Marketplace() {
                                                     )}
                                                 </div>
                                             </div>
-                                            {profile.subject && (
-                                                <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">
-                                                    {profile.subject}
-                                                </span>
-                                            )}
+                                            <div className="flex flex-wrap gap-1 justify-end max-w-[50%]">
+                                                {profile.subjects && profile.subjects.slice(0, 3).map((sub, idx) => (
+                                                    <span key={idx} className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">
+                                                        {sub}
+                                                    </span>
+                                                ))}
+                                                {profile.subjects && profile.subjects.length > 3 && (
+                                                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold rounded-full">
+                                                        +{profile.subjects.length - 3}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-6 min-h-[60px]">

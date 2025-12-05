@@ -9,6 +9,12 @@ export default function Students() {
     const [newStudent, setNewStudent] = useState({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Subjects State
+    const [availableSubjects, setAvailableSubjects] = useState([]);
+    const [isCustomSubject, setIsCustomSubject] = useState(false);
+    const [customSubject, setCustomSubject] = useState('');
+    const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology"];
+
     // Edit State
     const [editingStudent, setEditingStudent] = useState(null);
 
@@ -18,7 +24,18 @@ export default function Students() {
 
     useEffect(() => {
         fetchStudents();
+        fetchSubjects();
     }, []);
+
+    const fetchSubjects = async () => {
+        const { data, error } = await supabase
+            .from('subjects')
+            .select('*')
+            .order('name');
+        if (!error) {
+            setAvailableSubjects(data || []);
+        }
+    };
 
     const fetchStudents = async () => {
         const { data, error } = await supabase
@@ -34,24 +51,82 @@ export default function Students() {
 
     const openAddModal = () => {
         setEditingStudent(null);
-        setNewStudent({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
+        setNewStudent({ name: '', email: '', subject: 'Mathematics', hourly_rate: '', avatar_url: null });
+        setIsCustomSubject(false);
+        setCustomSubject('');
         setIsModalOpen(true);
     };
 
     const openEditModal = (student) => {
         setEditingStudent(student);
-        setNewStudent({
-            name: student.name,
-            email: student.email,
-            subject: student.subject,
-            hourly_rate: student.hourly_rate || '',
-            avatar_url: student.avatar_url
-        });
+
+        // Check if subject is standard or custom
+        const isStandard = STANDARD_SUBJECTS.includes(student.subject);
+        // Also check if it's in availableSubjects (DB subjects)
+        // If it's in DB subjects, we select it from dropdown.
+        // If it's not in STANDARD and not in DB subjects, it's a "Legacy" custom subject or just custom.
+        // For simplicity, if it's not in STANDARD, we treat it as custom input if not found in DB list?
+        // Actually, if it's in DB list, we just set subject to it.
+        // If it's NOT in DB list and NOT in Standard, we set it as "Other" + custom value.
+
+        const inDb = availableSubjects.some(s => s.name === student.subject);
+
+        if (isStandard || inDb) {
+            setNewStudent({
+                name: student.name,
+                email: student.email,
+                subject: student.subject,
+                hourly_rate: student.hourly_rate || '',
+                avatar_url: student.avatar_url
+            });
+            setIsCustomSubject(false);
+            setCustomSubject('');
+        } else {
+            setNewStudent({
+                name: student.name,
+                email: student.email,
+                subject: 'Other',
+                hourly_rate: student.hourly_rate || '',
+                avatar_url: student.avatar_url
+            });
+            setIsCustomSubject(true);
+            setCustomSubject(student.subject);
+        }
         setIsModalOpen(true);
     };
 
     const handleSaveStudent = async () => {
-        if (!newStudent.name || !newStudent.email || !newStudent.subject) return;
+        let finalSubject = newStudent.subject;
+
+        if (isCustomSubject) {
+            finalSubject = customSubject.trim();
+            if (!finalSubject) return; // Don't save if empty custom subject
+
+            // Auto-save new subject to DB if it doesn't exist
+            const existsInStandard = STANDARD_SUBJECTS.includes(finalSubject);
+            const existsInDb = availableSubjects.some(s => s.name.toLowerCase() === finalSubject.toLowerCase());
+
+            if (!existsInStandard && !existsInDb) {
+                try {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                        const { data: newSub, error: subError } = await supabase
+                            .from('subjects')
+                            .insert([{ user_id: user.id, name: finalSubject }])
+                            .select()
+                            .single();
+
+                        if (!subError && newSub) {
+                            setAvailableSubjects(prev => [...prev, newSub]);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error auto-saving subject:", err);
+                }
+            }
+        }
+
+        if (!newStudent.name || !newStudent.email || !finalSubject) return;
 
         let error;
         if (editingStudent) {
@@ -61,7 +136,7 @@ export default function Students() {
                 .update({
                     name: newStudent.name,
                     email: newStudent.email,
-                    subject: newStudent.subject,
+                    subject: finalSubject,
                     hourly_rate: newStudent.hourly_rate || null,
                     avatar_url: newStudent.avatar_url
                 })
@@ -75,7 +150,7 @@ export default function Students() {
                     {
                         name: newStudent.name,
                         email: newStudent.email,
-                        subject: newStudent.subject,
+                        subject: finalSubject,
                         hourly_rate: newStudent.hourly_rate || null,
                         avatar_url: newStudent.avatar_url,
                         status: 'Active',
@@ -92,6 +167,8 @@ export default function Students() {
             setIsModalOpen(false);
             setNewStudent({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
             setEditingStudent(null);
+            setIsCustomSubject(false);
+            setCustomSubject('');
         }
     };
 
@@ -181,11 +258,7 @@ export default function Students() {
                         <ArrowUpDown size={20} />
                     </button>
                     <button
-                        onClick={() => {
-                            setEditingStudent(null);
-                            setFormData({ name: '', email: '', subject: 'Mathematics', hourly_rate: 30, avatar_url: null });
-                            setIsModalOpen(true);
-                        }}
+                        onClick={openAddModal}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
                     >
                         <Plus size={20} />
@@ -392,18 +465,39 @@ export default function Students() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-                                    <select
-                                        value={formData.subject}
-                                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
-                                    >
-                                        <option value="Mathematics">Mathematics</option>
-                                        <option value="English">English</option>
-                                        <option value="Physics">Physics</option>
-                                        <option value="Marketing">Marketing</option>
-                                        <option value="Management">Management</option>
-                                        <option value="Law">Law</option>
-                                    </select>
+                                    <div className="flex flex-col gap-2">
+                                        <select
+                                            value={newStudent.subject}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === 'Other') {
+                                                    setIsCustomSubject(true);
+                                                    setNewStudent({ ...newStudent, subject: 'Other' });
+                                                } else {
+                                                    setIsCustomSubject(false);
+                                                    setNewStudent({ ...newStudent, subject: val });
+                                                }
+                                            }}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
+                                        >
+                                            <option value="" disabled>Select a subject</option>
+                                            {/* Combined List */}
+                                            {[...STANDARD_SUBJECTS, ...availableSubjects.map(s => s.name)].filter((v, i, a) => a.indexOf(v) === i).map(sub => (
+                                                <option key={sub} value={sub}>{sub}</option>
+                                            ))}
+                                            <option value="Other">Other (Add new...)</option>
+                                        </select>
+                                        {isCustomSubject && (
+                                            <input
+                                                type="text"
+                                                value={customSubject}
+                                                onChange={(e) => setCustomSubject(e.target.value)}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none animate-fade-in"
+                                                placeholder="Enter new subject..."
+                                                autoFocus
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hourly Rate (€)</label>
