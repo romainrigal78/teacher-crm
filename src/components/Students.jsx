@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Plus, Link as LinkIcon, Pencil, Trash2, Search, Filter, ArrowUpDown } from 'lucide-react';
+import { Plus, Link as LinkIcon, Pencil, Trash2, Search, Filter, ArrowUpDown, User } from 'lucide-react';
+import AvatarUpload from './AvatarUpload';
 
 export default function Students() {
     const [students, setStudents] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newStudent, setNewStudent] = useState({ name: '', email: '', subject: '', hourly_rate: '' });
+    const [newStudent, setNewStudent] = useState({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
     const [searchTerm, setSearchTerm] = useState('');
 
     // Edit State
@@ -33,7 +34,7 @@ export default function Students() {
 
     const openAddModal = () => {
         setEditingStudent(null);
-        setNewStudent({ name: '', email: '', subject: '', hourly_rate: '' });
+        setNewStudent({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
         setIsModalOpen(true);
     };
 
@@ -43,7 +44,8 @@ export default function Students() {
             name: student.name,
             email: student.email,
             subject: student.subject,
-            hourly_rate: student.hourly_rate || ''
+            hourly_rate: student.hourly_rate || '',
+            avatar_url: student.avatar_url
         });
         setIsModalOpen(true);
     };
@@ -60,7 +62,8 @@ export default function Students() {
                     name: newStudent.name,
                     email: newStudent.email,
                     subject: newStudent.subject,
-                    hourly_rate: newStudent.hourly_rate || null
+                    hourly_rate: newStudent.hourly_rate || null,
+                    avatar_url: newStudent.avatar_url
                 })
                 .eq('id', editingStudent.id);
             error = updateError;
@@ -74,6 +77,7 @@ export default function Students() {
                         email: newStudent.email,
                         subject: newStudent.subject,
                         hourly_rate: newStudent.hourly_rate || null,
+                        avatar_url: newStudent.avatar_url,
                         status: 'Active',
                         last_payment: new Date()
                     }
@@ -86,7 +90,7 @@ export default function Students() {
         } else {
             fetchStudents();
             setIsModalOpen(false);
-            setNewStudent({ name: '', email: '', subject: '', hourly_rate: '' });
+            setNewStudent({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
             setEditingStudent(null);
         }
     };
@@ -179,7 +183,7 @@ export default function Students() {
                     <button
                         onClick={() => {
                             setEditingStudent(null);
-                            setFormData({ name: '', email: '', subject: 'Mathematics', hourly_rate: 30 });
+                            setFormData({ name: '', email: '', subject: 'Mathematics', hourly_rate: 30, avatar_url: null });
                             setIsModalOpen(true);
                         }}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
@@ -207,9 +211,17 @@ export default function Students() {
                             <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
-                                            {student.name.charAt(0)}
-                                        </div>
+                                        {student.avatar_url ? (
+                                            <img
+                                                src={student.avatar_url}
+                                                alt={student.name}
+                                                className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
+                                                {student.name.charAt(0)}
+                                            </div>
+                                        )}
                                         <div>
                                             <div className="font-medium text-gray-900 dark:text-white">{student.name}</div>
                                             <div className="text-xs text-gray-500 dark:text-gray-400">{student.email}</div>
@@ -240,7 +252,8 @@ export default function Students() {
                                                     name: student.name,
                                                     email: student.email,
                                                     subject: student.subject,
-                                                    hourly_rate: student.hourly_rate || 30
+                                                    hourly_rate: student.hourly_rate || 30,
+                                                    avatar_url: student.avatar_url
                                                 });
                                                 setIsModalOpen(true);
                                             }}
@@ -270,9 +283,17 @@ export default function Students() {
                     <div key={student.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
-                                    {student.name.charAt(0)}
-                                </div>
+                                {student.avatar_url ? (
+                                    <img
+                                        src={student.avatar_url}
+                                        alt={student.name}
+                                        className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                                    />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+                                        {student.name.charAt(0)}
+                                    </div>
+                                )}
                                 <div>
                                     <h3 className="font-semibold text-gray-900 dark:text-white">{student.name}</h3>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{student.email}</p>
@@ -308,7 +329,8 @@ export default function Students() {
                                         name: student.name,
                                         email: student.email,
                                         subject: student.subject,
-                                        hourly_rate: student.hourly_rate || 30
+                                        hourly_rate: student.hourly_rate || 30,
+                                        avatar_url: student.avatar_url
                                     });
                                     setIsModalOpen(true);
                                 }}
@@ -336,6 +358,13 @@ export default function Students() {
                         </h2>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="flex justify-center mb-6">
+                                <AvatarUpload
+                                    url={formData.avatar_url}
+                                    onUpload={(url) => setFormData({ ...formData, avatar_url: url })}
+                                    size={100}
+                                />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
                                 <input
@@ -409,20 +438,20 @@ export default function Students() {
             )}
             {/* Delete Confirmation Modal */}
             {isDeleteModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 text-center border border-gray-800">
-                        <h2 className="text-xl font-bold mb-4 text-white">Confirm Deletion</h2>
-                        <p className="text-gray-400 mb-8">Are you sure you want to delete this student?</p>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-xl w-96 text-center border border-gray-100 dark:border-gray-700">
+                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Confirm Deletion</h2>
+                        <p className="text-gray-600 dark:text-gray-300 mb-8">Are you sure you want to delete this student?</p>
                         <div className="flex justify-center gap-4">
                             <button
                                 onClick={() => setIsDeleteModalOpen(false)}
-                                className="px-6 py-2 bg-gray-700 text-gray-200 font-bold rounded-lg hover:bg-gray-600 transition-colors"
+                                className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleDeleteStudent}
-                                className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-500 transition-colors shadow-lg shadow-red-600/20"
+                                className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
                             >
                                 Confirm
                             </button>

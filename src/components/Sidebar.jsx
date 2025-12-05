@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { LayoutDashboard, Users, CalendarDays, DollarSign, Settings, LogOut, Menu, X } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ userAvatarUrl }) => {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -104,9 +104,17 @@ const Sidebar = () => {
           {/* User info section (optional, can be re-added if needed) */}
           {!loading && user && (
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center font-bold text-sm text-white">
-                {getInitials(user?.user_metadata?.full_name || user?.email)}
-              </div>
+              {userAvatarUrl ? (
+                <img
+                  src={userAvatarUrl}
+                  alt="User Avatar"
+                  className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center font-bold text-sm text-white">
+                  {getInitials(user?.user_metadata?.full_name || user?.email)}
+                </div>
+              )}
               <div className="overflow-hidden">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={user?.user_metadata?.full_name || user?.email}>
                   {user?.user_metadata?.full_name || 'User'}

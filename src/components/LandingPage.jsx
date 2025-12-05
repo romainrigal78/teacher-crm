@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function LandingPage({ onSignInClick }) {
     return (
@@ -10,12 +11,17 @@ export default function LandingPage({ onSignInClick }) {
                     <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">T</div>
                     <span className="text-xl font-bold tracking-tight text-gray-900">TeacherCRM</span>
                 </div>
-                <button
-                    onClick={onSignInClick}
-                    className="text-sm font-semibold text-gray-600 hover:text-blue-600 transition-colors"
-                >
-                    Sign In
-                </button>
+                <div className="flex items-center gap-4">
+                    <Link to="/search" className="text-sm font-semibold text-gray-600 hover:text-blue-600 transition-colors">
+                        Find a Teacher
+                    </Link>
+                    <button
+                        onClick={onSignInClick}
+                        className="text-sm font-semibold text-gray-600 hover:text-blue-600 transition-colors"
+                    >
+                        Sign In
+                    </button>
+                </div>
             </header>
 
             {/* Hero Section */}
