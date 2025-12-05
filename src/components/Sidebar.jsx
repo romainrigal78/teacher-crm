@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { LayoutDashboard, Users, CalendarDays, DollarSign, Settings, LogOut, Menu, X, GraduationCap } from 'lucide-react';
+import Logo from './Logo';
 
 const Sidebar = ({ userAvatarUrl }) => {
   const location = useLocation();
@@ -49,6 +50,10 @@ const Sidebar = ({ userAvatarUrl }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const toggleSidebar = () => {
+    setIsOpen(!isOpen);
+  };
+
   const menuItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Students', path: '/students', icon: Users },
@@ -71,14 +76,15 @@ const Sidebar = ({ userAvatarUrl }) => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null); // Clear user state on sign out
-    setIsOpen(false); // Close sidebar on sign out
+    navigate('/'); // Redirect to home or login page
+    toggleSidebar(); // Close sidebar on sign out
   };
 
   return (
     <>
       {/* Mobile Menu Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleSidebar}
         className="md:hidden fixed top-4 right-4 z-50 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md text-gray-600 dark:text-gray-300"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -90,10 +96,11 @@ const Sidebar = ({ userAvatarUrl }) => {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:flex flex-col
       `}>
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
-            <span className="text-3xl">✨</span> CRM
-          </h1>
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <Logo />
+          <button onClick={toggleSidebar} className="md:hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <X size={24} />
+          </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -105,7 +112,7 @@ const Sidebar = ({ userAvatarUrl }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => setIsOpen(false)}
+                onClick={toggleSidebar}
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
                   ${isActive

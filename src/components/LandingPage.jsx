@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import Logo from './Logo';
 
 export default function LandingPage({ onSignInClick }) {
     return (
@@ -7,9 +8,7 @@ export default function LandingPage({ onSignInClick }) {
             {/* Header */}
             <header className="flex items-center justify-between px-6 py-4 border-b border-gray-800 sticky top-0 bg-gray-900/80 backdrop-blur-md z-50">
                 <div className="flex items-center gap-2">
-                    {/* Logo placeholder - could be an icon or text */}
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">T</div>
-                    <span className="text-xl font-bold tracking-tight text-white">TeacherCRM</span>
+                    <Logo />
                 </div>
                 <div className="flex items-center gap-4">
                     <Link to="/search" className="text-sm font-semibold text-gray-300 hover:text-white transition-colors">
