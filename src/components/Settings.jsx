@@ -17,6 +17,10 @@ const Settings = ({ onAvatarUpdate }) => {
     const [bio, setBio] = useState('');
     const [city, setCity] = useState('');
     const [theme, setTheme] = useState('System');
+    const [publicEmail, setPublicEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [showEmail, setShowEmail] = useState(false);
+    const [showPhone, setShowPhone] = useState(false);
     const [message, setMessage] = useState(null);
 
     const [currentPassword, setCurrentPassword] = useState('');
@@ -103,6 +107,12 @@ const Settings = ({ onAvatarUpdate }) => {
                     setBio(data.bio || '');
                     setCity(data.city || '');
                     setTheme(data.theme || 'System');
+                    setPublicEmail(data.public_email || '');
+                    setPhone(data.phone || '');
+                    setPublicEmail(data.public_email || '');
+                    setPhone(data.phone || '');
+                    setShowEmail(data.show_email || false);
+                    setShowPhone(data.show_phone || false);
 
                     // Handle Subject Logic
                     // We combine standard and custom subjects for the check
@@ -219,6 +229,10 @@ const Settings = ({ onAvatarUpdate }) => {
                 city,
                 theme,
                 updated_at: new Date(),
+                public_email: publicEmail,
+                phone: phone,
+                show_email: showEmail,
+                show_phone: showPhone,
             };
 
             const { error } = await supabase
@@ -293,6 +307,51 @@ const Settings = ({ onAvatarUpdate }) => {
                                     value={city}
                                     onSelect={setCity}
                                     placeholder="Paris, France"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Contact Information Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Public Email</label>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input type="checkbox" className="sr-only" checked={showEmail} onChange={(e) => setShowEmail(e.target.checked)} />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${showEmail ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showEmail ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Show on Marketplace</span>
+                                    </label>
+                                </div>
+                                <input
+                                    type="email"
+                                    value={publicEmail}
+                                    onChange={(e) => setPublicEmail(e.target.value)}
+                                    className={inputClasses}
+                                    placeholder="contact@example.com"
+                                />
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone Number</label>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input type="checkbox" className="sr-only" checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)} />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${showPhone ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showPhone ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Show on Marketplace</span>
+                                    </label>
+                                </div>
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    className={inputClasses}
+                                    placeholder="+33 6 12 34 56 78"
                                 />
                             </div>
                         </div>
@@ -378,8 +437,8 @@ const Settings = ({ onAvatarUpdate }) => {
                     <form onSubmit={handleChangePassword} className="space-y-6 max-w-md">
                         {statusMessage.text && (
                             <div className={`p-3 mb-4 rounded-md border ${statusMessage.type === 'error'
-                                    ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800'
-                                    : 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+                                ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800'
+                                : 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
                                 }`}>
                                 {statusMessage.text}
                             </div>

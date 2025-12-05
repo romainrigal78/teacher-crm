@@ -9,6 +9,8 @@ export default function Marketplace() {
     const [loading, setLoading] = useState(true);
     const [subjectFilter, setSubjectFilter] = useState('');
     const [cityFilter, setCityFilter] = useState('');
+    const [contactModalOpen, setContactModalOpen] = useState(false);
+    const [selectedTeacher, setSelectedTeacher] = useState(null);
 
     const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology", "Piano", "Coach Sportif"];
 
@@ -178,18 +180,15 @@ export default function Marketplace() {
                                             {profile.bio || "No bio available."}
                                         </p>
 
-                                        <a
-                                            href={`mailto:${profile.email || ''}`}
-                                            onClick={(e) => {
-                                                if (!profile.email) {
-                                                    e.preventDefault();
-                                                    alert("Contact info not public.");
-                                                }
+                                        <button
+                                            onClick={() => {
+                                                setSelectedTeacher(profile);
+                                                setContactModalOpen(true);
                                             }}
                                             className="block w-full py-3 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white text-center font-semibold rounded-xl transition-colors"
                                         >
                                             Contact Teacher
-                                        </a>
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -205,6 +204,104 @@ export default function Marketplace() {
                     </>
                 )}
             </div>
+
+            {/* Contact Modal */}
+            {contactModalOpen && selectedTeacher && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full border border-gray-100 dark:border-gray-700 relative animate-in fade-in zoom-in duration-200">
+                        <button
+                            onClick={() => setContactModalOpen(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+
+                        <div className="text-center mb-6">
+                            {selectedTeacher.avatar_url ? (
+                                <img
+                                    src={selectedTeacher.avatar_url}
+                                    alt={selectedTeacher.full_name}
+                                    className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-md mx-auto mb-3"
+                                />
+                            ) : (
+                                <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-2xl border-4 border-white dark:border-gray-700 shadow-md mx-auto mb-3">
+                                    {(selectedTeacher.full_name || 'U').charAt(0)}
+                                </div>
+                            )}
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedTeacher.full_name}</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Contact Information</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            {selectedTeacher.public_email && selectedTeacher.show_email ? (
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-lg">
+                                            <Mail size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Email</p>
+                                            <p className="text-gray-900 dark:text-white font-medium break-all">{selectedTeacher.public_email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <a
+                                            href={`mailto:${selectedTeacher.public_email}`}
+                                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg text-center transition-colors"
+                                        >
+                                            Send Email
+                                        </a>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(selectedTeacher.public_email);
+                                                alert('Email copied to clipboard!');
+                                            }}
+                                            className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-lg transition-colors"
+                                        >
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {selectedTeacher.phone && selectedTeacher.show_phone ? (
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-lg">
+                                            <User size={20} /> {/* Using User icon as phone fallback or import Phone */}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Phone</p>
+                                            <p className="text-gray-900 dark:text-white font-medium">{selectedTeacher.phone}</p>
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={`tel:${selectedTeacher.phone}`}
+                                        className="block w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg text-center transition-colors"
+                                    >
+                                        Call Now
+                                    </a>
+                                </div>
+                            ) : null}
+
+                            {(!selectedTeacher.public_email || !selectedTeacher.show_email) && (!selectedTeacher.phone || !selectedTeacher.show_phone) && (
+                                <div className="text-center py-6 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-200 dark:border-gray-600">
+                                    <p>This teacher has not shared their direct contact info yet.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <button
+                                onClick={() => setContactModalOpen(false)}
+                                className="w-full py-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-medium transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

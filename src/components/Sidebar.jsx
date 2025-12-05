@@ -1,23 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { LayoutDashboard, Users, CalendarDays, DollarSign, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, DollarSign, Settings, LogOut, Menu, X, GraduationCap } from 'lucide-react';
 
 const Sidebar = ({ userAvatarUrl }) => {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState({ isPro: false, daysLeft: 0 });
 
   useEffect(() => {
-    const getUser = async () => {
+    const getUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_pro, subscription_end_date')
+          .eq('id', user.id)
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile) {
+          const endDate = new Date(profile.subscription_end_date);
+          const now = new Date();
+          const diffTime = endDate - now; // Can be negative if expired
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          setSubscriptionStatus({
+            isPro: profile.is_pro,
+            daysLeft: diffDays > 0 ? diffDays : 0
+          });
+        }
+      }
       setLoading(false);
     };
-    getUser();
+    getUserData();
 
-    // Listen for auth changes (e.g. profile update)
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -30,6 +52,7 @@ const Sidebar = ({ userAvatarUrl }) => {
   const menuItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Students', path: '/students', icon: Users },
+    { label: 'Grades', path: '/grades', icon: GraduationCap },
     { label: 'Calendar', path: '/calendar', icon: CalendarDays },
     { label: 'Billing', path: '/billing', icon: DollarSign },
     { label: 'Settings', path: '/settings', icon: Settings },
@@ -101,7 +124,6 @@ const Sidebar = ({ userAvatarUrl }) => {
         </nav>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          {/* User info section (optional, can be re-added if needed) */}
           {!loading && user && (
             <div className="flex items-center gap-3 mb-4">
               {userAvatarUrl ? (
@@ -115,13 +137,32 @@ const Sidebar = ({ userAvatarUrl }) => {
                   {getInitials(user?.user_metadata?.full_name || user?.email)}
                 </div>
               )}
-              <div className="overflow-hidden">
+              <div className="overflow-hidden flex-1">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={user?.user_metadata?.full_name || user?.email}>
                   {user?.user_metadata?.full_name || 'User'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={user?.email}>
-                  {user?.email}
-                </p>
+
+                {/* Subscription Status */}
+                <div className="mt-1">
+                  {subscriptionStatus.isPro ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                      PRO PLAN
+                    </span>
+                  ) : (
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Trial: {subscriptionStatus.daysLeft} days left
+                      </span>
+                      <a
+                        href="#"
+                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={(e) => { e.preventDefault(); alert("Redirect to Stripe (Coming Soon)"); }}
+                      >
+                        Upgrade to Pro
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

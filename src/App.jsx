@@ -11,6 +11,9 @@ import Login from './components/Login'
 import LandingPage from './components/LandingPage'
 import StudentDashboard from './components/StudentDashboard'
 import Marketplace from './components/Marketplace'
+import Paywall from './components/Paywall'
+import PaymentSuccess from './components/PaymentSuccess'
+import Grades from './components/Grades'
 import './App.css'
 
 function App() {
@@ -67,7 +70,8 @@ function App() {
         .from('profiles')
         .select('avatar_url')
         .eq('id', userId)
-        .single()
+        .eq('id', userId)
+        .maybeSingle()
 
       if (data) {
         setUserAvatarUrl(data.avatar_url)
@@ -83,7 +87,8 @@ function App() {
         .from('profiles')
         .select('theme')
         .eq('id', userId)
-        .single()
+        .eq('id', userId)
+        .maybeSingle()
 
       const root = document.documentElement;
       if (data?.theme === 'Dark') {
@@ -158,13 +163,14 @@ function App() {
     <BrowserRouter>
       <Layout userAvatarUrl={userAvatarUrl}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/students" element={<Students />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/billing" element={<Billing />} />
+          <Route path="/" element={<Paywall><Dashboard /></Paywall>} />
+          <Route path="/students" element={<Paywall><Students /></Paywall>} />
+          <Route path="/grades" element={<Grades />} />
+          <Route path="/calendar" element={<Paywall><Calendar /></Paywall>} />
+          <Route path="/billing" element={<Paywall><Billing /></Paywall>} />
           <Route path="/settings" element={<Settings onAvatarUpdate={setUserAvatarUrl} />} />
-          {/* Allow teachers to view marketplace too? Maybe not needed in layout but useful */}
           <Route path="/search" element={<Marketplace />} />
+          <Route path="/payment-success" element={<PaymentSuccess />} />
         </Routes>
       </Layout>
     </BrowserRouter>
