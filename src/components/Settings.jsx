@@ -21,6 +21,7 @@ const Settings = ({ onAvatarUpdate }) => {
     const [phone, setPhone] = useState('');
     const [showEmail, setShowEmail] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
     const [message, setMessage] = useState(null);
 
     const [currentPassword, setCurrentPassword] = useState('');
@@ -30,6 +31,8 @@ const Settings = ({ onAvatarUpdate }) => {
 
     const [availableSubjects, setAvailableSubjects] = useState([]);
     const [newSubjectInput, setNewSubjectInput] = useState('');
+    const [editSubjectModalOpen, setEditSubjectModalOpen] = useState(false);
+    const [editingSubject, setEditingSubject] = useState(null);
 
     const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology"];
 
@@ -80,9 +83,34 @@ const Settings = ({ onAvatarUpdate }) => {
 
             if (error) throw error;
             setAvailableSubjects(availableSubjects.filter(s => s.id !== id));
+            setEditSubjectModalOpen(false); // Close modal if open
         } catch (error) {
             console.error('Error deleting subject:', error);
             setMessage({ type: 'error', text: 'Failed to delete subject' });
+        }
+    };
+
+    const handleSubjectClick = (sub) => {
+        setEditingSubject({ ...sub, hourly_rate: sub.hourly_rate || 30 });
+        setEditSubjectModalOpen(true);
+    };
+
+    const handleSaveSubject = async (e) => {
+        e.preventDefault();
+        try {
+            const { error } = await supabase
+                .from('subjects')
+                .update({ name: editingSubject.name, hourly_rate: editingSubject.hourly_rate })
+                .eq('id', editingSubject.id);
+
+            if (error) throw error;
+
+            setAvailableSubjects(availableSubjects.map(s => s.id === editingSubject.id ? editingSubject : s));
+            setEditSubjectModalOpen(false);
+            setMessage({ type: 'success', text: 'Subject updated successfully' });
+        } catch (error) {
+            console.error('Error updating subject:', error);
+            setMessage({ type: 'error', text: 'Failed to update subject' });
         }
     };
 
@@ -109,10 +137,9 @@ const Settings = ({ onAvatarUpdate }) => {
                     setTheme(data.theme || 'System');
                     setPublicEmail(data.public_email || '');
                     setPhone(data.phone || '');
-                    setPublicEmail(data.public_email || '');
-                    setPhone(data.phone || '');
                     setShowEmail(data.show_email || false);
                     setShowPhone(data.show_phone || false);
+                    setIsPublic(data.is_public || false);
 
                     // Handle Subject Logic
                     // We combine standard and custom subjects for the check
@@ -233,6 +260,7 @@ const Settings = ({ onAvatarUpdate }) => {
                 phone: phone,
                 show_email: showEmail,
                 show_phone: showPhone,
+                is_public: isPublic,
             };
 
             const { error } = await supabase
@@ -356,21 +384,36 @@ const Settings = ({ onAvatarUpdate }) => {
                             </div>
                         </div>
 
+                        {/* Privacy Section */}
+                        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Privacy & Visibility</h3>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Make my Profile Public in Marketplace</label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">If unchecked, you will not appear in search results.</p>
+                                </div>
+                                <label className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input type="checkbox" className="sr-only" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+                                        <div className={`block w-10 h-6 rounded-full transition-colors ${isPublic ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isPublic ? 'transform translate-x-4' : ''}`}></div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         {/* Manage Subjects Section */}
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">My Subjects</label>
 
                             <div className="flex flex-wrap mb-4">
                                 {availableSubjects.map(sub => (
-                                    <span key={sub.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 mr-2 mb-2 dark:bg-blue-900/30 dark:text-blue-300">
+                                    <span
+                                        key={sub.id}
+                                        onClick={() => handleSubjectClick(sub)}
+                                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 mr-2 mb-2 dark:bg-blue-900/30 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                                    >
                                         {sub.name}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeleteSubject(sub.id)}
-                                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 focus:outline-none"
-                                        >
-                                            <X size={14} />
-                                        </button>
                                     </span>
                                 ))}
                                 {availableSubjects.length === 0 && (
@@ -487,7 +530,68 @@ const Settings = ({ onAvatarUpdate }) => {
                     </form>
                 </div>
             </div>
-        </div>
+
+
+            {/* Edit Subject Modal */}
+            {
+                editSubjectModalOpen && editingSubject && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in duration-200">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Edit Subject</h3>
+                                <button
+                                    onClick={() => setEditSubjectModalOpen(false)}
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSaveSubject} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingSubject.name}
+                                        onChange={(e) => setEditingSubject({ ...editingSubject, name: e.target.value })}
+                                        className={inputClasses}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Hourly Rate (€)</label>
+                                    <input
+                                        type="number"
+                                        value={editingSubject.hourly_rate}
+                                        onChange={(e) => setEditingSubject({ ...editingSubject, hourly_rate: parseFloat(e.target.value) })}
+                                        className={inputClasses}
+                                        min="0"
+                                        step="0.5"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteSubject(editingSubject.id)}
+                                        className="flex-1 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-medium rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                                    >
+                                        Delete
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Search, MapPin, Mail, BookOpen, User } from 'lucide-react';
+import { Search, MapPin, Mail, BookOpen, User, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CityAutocomplete from './CityAutocomplete';
 
@@ -19,41 +19,60 @@ export default function Marketplace() {
     }, []);
 
     const fetchProfiles = async () => {
+        console.log("Fetching profiles..."); // Debug 1
         try {
             setLoading(true);
 
-            // Fetch Profiles
+            // Fetch Profiles with Subjects and Reviews
+            // Simplify query to isolate the issue (Remove filters first)
             const { data: profilesData, error: profilesError } = await supabase
                 .from('profiles')
-                .select('*');
+                .select('*, subjects(name), reviews(rating)');
 
-            if (profilesError) throw profilesError;
+            if (profilesError) {
+                console.error("Supabase Error:", profilesError); // Debug 2
+                alert("Error fetching profiles: " + profilesError.message);
+                throw profilesError;
+            }
 
-            // Fetch Subjects
-            const { data: subjectsData, error: subjectsError } = await supabase
-                .from('subjects')
-                .select('*');
+            console.log("Data received:", profilesData); // Debug 3
 
-            if (subjectsError) throw subjectsError;
+            if (!profilesData || profilesData.length === 0) {
+                console.warn("No profiles found in DB!"); // Debug 4
+            }
 
-            // Map subjects to profiles
-            const profilesWithSubjects = (profilesData || []).map(profile => {
-                const userSubjects = (subjectsData || []).filter(s => s.user_id === profile.id);
-                // Combine legacy single subject with new subjects table
+            // Manually filter locally instead of in SQL for now
+            // We want to show public profiles only, but for debugging we might want to see all if needed.
+            // But the requirement is to filter.
+            const publicProfiles = (profilesData || []).filter(p => p.is_public === true);
+            console.log("Public profiles after filter:", publicProfiles);
+
+            // Map subjects and calculate ratings
+            const profilesWithData = publicProfiles.map(profile => {
+                // Subjects
                 const allSubjects = [];
                 if (profile.subject) allSubjects.push(profile.subject);
-                userSubjects.forEach(s => allSubjects.push(s.name));
-
-                // Deduplicate
+                if (profile.subjects) {
+                    profile.subjects.forEach(s => allSubjects.push(s.name));
+                }
                 const uniqueSubjects = [...new Set(allSubjects)];
+
+                // Ratings
+                const reviews = profile.reviews || [];
+                const reviewCount = reviews.length;
+                const averageRating = reviewCount > 0
+                    ? (reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviewCount).toFixed(1)
+                    : null;
 
                 return {
                     ...profile,
-                    subjects: uniqueSubjects
+                    subjects: uniqueSubjects,
+                    rating: averageRating,
+                    reviewCount: reviewCount
                 };
             });
 
-            setProfiles(profilesWithSubjects);
+            setProfiles(profilesWithData);
         } catch (error) {
             console.error('Error fetching profiles:', error);
         } finally {
@@ -105,11 +124,6 @@ export default function Marketplace() {
                             />
                         </div>
                         <div className="flex-1 relative">
-                            {/* MapPin icon is handled inside CityAutocomplete now, or we can keep it if we want consistent styling with the select box. 
-                                The CityAutocomplete has its own icon. Let's use it directly but we might need to adjust styling to match the select box next to it.
-                                The CityAutocomplete uses standard input styling. The select box uses specific styling.
-                                Let's try to make them look similar.
-                            */}
                             <CityAutocomplete
                                 value={cityFilter}
                                 onSelect={setCityFilter}
@@ -137,23 +151,43 @@ export default function Marketplace() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredProfiles.map(profile => (
-                                <div key={profile.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-md transition-all duration-300">
-                                    <div className="p-6">
+                                <div
+                                    key={profile.id}
+                                    onClick={() => {
+                                        setSelectedTeacher(profile);
+                                        setContactModalOpen(true);
+                                    }}
+                                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col h-full"
+                                >
+                                    <div className="p-6 flex flex-col h-full">
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex items-center gap-4">
                                                 {profile.avatar_url ? (
                                                     <img
                                                         src={profile.avatar_url}
                                                         alt={profile.full_name}
-                                                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 dark:border-gray-600"
+                                                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 dark:border-gray-600 shrink-0"
                                                     />
                                                 ) : (
-                                                    <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xl border-2 border-blue-100 dark:border-blue-800">
+                                                    <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xl border-2 border-blue-100 dark:border-blue-800 shrink-0 shadow-sm">
                                                         {(profile.full_name || 'U').charAt(0)}
                                                     </div>
                                                 )}
                                                 <div>
                                                     <h3 className="font-bold text-lg text-gray-900 dark:text-white">{profile.full_name || 'Teacher'}</h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {profile.rating ? (
+                                                            <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 dark:text-yellow-400 border border-yellow-100 dark:border-yellow-900/30">
+                                                                <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                                                                <span>{profile.rating}</span>
+                                                                <span className="text-gray-400 dark:text-gray-500">({profile.reviewCount})</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-100 dark:border-green-900/30">
+                                                                New
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     {profile.city && (
                                                         <div className="flex items-center text-gray-500 dark:text-gray-400 text-sm mt-1">
                                                             <MapPin size={14} className="mr-1" />
@@ -162,32 +196,29 @@ export default function Marketplace() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex flex-wrap gap-1 justify-end max-w-[50%]">
-                                                {profile.subjects && profile.subjects.slice(0, 3).map((sub, idx) => (
-                                                    <span key={idx} className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">
-                                                        {sub}
-                                                    </span>
-                                                ))}
-                                                {profile.subjects && profile.subjects.length > 3 && (
-                                                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold rounded-full">
-                                                        +{profile.subjects.length - 3}
-                                                    </span>
-                                                )}
-                                            </div>
                                         </div>
 
-                                        <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-6 min-h-[60px]">
+                                        <div className="flex flex-wrap gap-2 mb-4">
+                                            {profile.subjects && profile.subjects.slice(0, 3).map((sub, idx) => (
+                                                <span key={idx} className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">
+                                                    {sub}
+                                                </span>
+                                            ))}
+                                            {profile.subjects && profile.subjects.length > 3 && (
+                                                <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold rounded-full">
+                                                    +{profile.subjects.length - 3}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-6 flex-grow">
                                             {profile.bio || "No bio available."}
                                         </p>
 
                                         <button
-                                            onClick={() => {
-                                                setSelectedTeacher(profile);
-                                                setContactModalOpen(true);
-                                            }}
-                                            className="block w-full py-3 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white text-center font-semibold rounded-xl transition-colors"
+                                            className="block w-full py-3 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white text-center font-semibold rounded-xl transition-colors mt-auto"
                                         >
-                                            Contact Teacher
+                                            View Profile
                                         </button>
                                     </div>
                                 </div>
@@ -199,102 +230,149 @@ export default function Marketplace() {
                                 <User size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">No teachers found</h3>
                                 <p className="text-gray-500 dark:text-gray-400">Try adjusting your search filters.</p>
+                                <p className="text-red-500 font-bold mt-4">(Debug: Check Console)</p>
                             </div>
                         )}
                     </>
                 )}
             </div>
 
-            {/* Contact Modal */}
+            {/* Teacher Profile Modal */}
             {contactModalOpen && selectedTeacher && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full border border-gray-100 dark:border-gray-700 relative animate-in fade-in zoom-in duration-200">
-                        <button
-                            onClick={() => setContactModalOpen(false)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-100 dark:border-gray-700 relative animate-in fade-in zoom-in duration-200 my-8 flex flex-col max-h-[90vh]">
+                        <div className="p-6 overflow-y-auto custom-scrollbar">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setContactModalOpen(false);
+                                }}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors z-10 bg-white dark:bg-gray-800 rounded-full p-1"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
 
-                        <div className="text-center mb-6">
-                            {selectedTeacher.avatar_url ? (
-                                <img
-                                    src={selectedTeacher.avatar_url}
-                                    alt={selectedTeacher.full_name}
-                                    className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-md mx-auto mb-3"
-                                />
-                            ) : (
-                                <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-2xl border-4 border-white dark:border-gray-700 shadow-md mx-auto mb-3">
-                                    {(selectedTeacher.full_name || 'U').charAt(0)}
+                            <div className="flex flex-col md:flex-row gap-6 mb-8">
+                                <div className="flex-shrink-0 text-center md:text-left">
+                                    {selectedTeacher.avatar_url ? (
+                                        <img
+                                            src={selectedTeacher.avatar_url}
+                                            alt={selectedTeacher.full_name}
+                                            className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-md mx-auto md:mx-0"
+                                        />
+                                    ) : (
+                                        <div className="w-24 h-24 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-3xl border-4 border-white dark:border-gray-700 shadow-md mx-auto md:mx-0">
+                                            {(selectedTeacher.full_name || 'U').charAt(0)}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedTeacher.full_name}</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Contact Information</p>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white text-center md:text-left">{selectedTeacher.full_name}</h3>
+                                    <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
+                                        {selectedTeacher.subjects && selectedTeacher.subjects.map((sub, idx) => (
+                                            <span key={idx} className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-semibold rounded-full">
+                                                {sub}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    {selectedTeacher.city && (
+                                        <div className="flex items-center justify-center md:justify-start text-gray-500 dark:text-gray-400 mt-2">
+                                            <MapPin size={16} className="mr-1" />
+                                            {selectedTeacher.city}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="mb-8">
+                                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">About</h4>
+                                <p className="text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                    {selectedTeacher.bio || "No biography provided."}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Contact Information</h4>
+                                    <div className="space-y-3">
+                                        {selectedTeacher.public_email && selectedTeacher.show_email ? (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600 flex items-center gap-3">
+                                                <div className="p-2 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-lg">
+                                                    <Mail size={18} />
+                                                </div>
+                                                <div className="overflow-hidden">
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase">Email</p>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{selectedTeacher.public_email}</p>
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {selectedTeacher.phone && selectedTeacher.show_phone ? (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600 flex items-center gap-3">
+                                                <div className="p-2 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-lg">
+                                                    <User size={18} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase">Phone</p>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedTeacher.phone}</p>
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {(!selectedTeacher.public_email || !selectedTeacher.show_email) && (!selectedTeacher.phone || !selectedTeacher.show_phone) && (
+                                            <div className="text-center py-4 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-sm">
+                                                No direct contact info shared.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Location</h4>
+                                    <div className="rounded-xl overflow-hidden h-48 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 relative">
+                                        {selectedTeacher.city ? (
+                                            <iframe
+                                                width="100%"
+                                                height="100%"
+                                                frameBorder="0"
+                                                style={{ border: 0 }}
+                                                src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(selectedTeacher.city)}`}
+                                                allowFullScreen
+                                                title="Teacher Location"
+                                                className="grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+                                            ></iframe>
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                                                Location not available
+                                            </div>
+                                        )}
+                                        {/* Note: Google Maps Embed requires an API Key. Using a placeholder or simple iframe if no key. 
+                                            Actually, for simple city search, we can use the embed API or just a link. 
+                                            Since I don't have an API key, I'll use a direct maps search link or a placeholder message 
+                                            that it requires an API key, OR use OpenStreetMap which is free. 
+                                            Let's use OpenStreetMap for now to ensure it works without config. */}
+                                        <div className="absolute inset-0 z-10 pointer-events-none border-4 border-transparent"></div>
+                                    </div>
+                                    {selectedTeacher.city && (
+                                        <div className="mt-2 text-right">
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedTeacher.city)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-600 hover:underline"
+                                            >
+                                                Open in Google Maps
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="space-y-4">
-                            {selectedTeacher.public_email && selectedTeacher.show_email ? (
-                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="p-2 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-lg">
-                                            <Mail size={20} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Email</p>
-                                            <p className="text-gray-900 dark:text-white font-medium break-all">{selectedTeacher.public_email}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <a
-                                            href={`mailto:${selectedTeacher.public_email}`}
-                                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg text-center transition-colors"
-                                        >
-                                            Send Email
-                                        </a>
-                                        <button
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(selectedTeacher.public_email);
-                                                alert('Email copied to clipboard!');
-                                            }}
-                                            className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-lg transition-colors"
-                                        >
-                                            Copy
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            {selectedTeacher.phone && selectedTeacher.show_phone ? (
-                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="p-2 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-lg">
-                                            <User size={20} /> {/* Using User icon as phone fallback or import Phone */}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Phone</p>
-                                            <p className="text-gray-900 dark:text-white font-medium">{selectedTeacher.phone}</p>
-                                        </div>
-                                    </div>
-                                    <a
-                                        href={`tel:${selectedTeacher.phone}`}
-                                        className="block w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg text-center transition-colors"
-                                    >
-                                        Call Now
-                                    </a>
-                                </div>
-                            ) : null}
-
-                            {(!selectedTeacher.public_email || !selectedTeacher.show_email) && (!selectedTeacher.phone || !selectedTeacher.show_phone) && (
-                                <div className="text-center py-6 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-200 dark:border-gray-600">
-                                    <p>This teacher has not shared their direct contact info yet.</p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                        <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl flex justify-end">
                             <button
                                 onClick={() => setContactModalOpen(false)}
-                                className="w-full py-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-medium transition-colors"
+                                className="px-6 py-2 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
                             >
                                 Close
                             </button>

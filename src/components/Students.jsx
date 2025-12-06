@@ -13,7 +13,6 @@ export default function Students() {
     const [availableSubjects, setAvailableSubjects] = useState([]);
     const [isCustomSubject, setIsCustomSubject] = useState(false);
     const [customSubject, setCustomSubject] = useState('');
-    const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology"];
 
     // Edit State
     const [editingStudent, setEditingStudent] = useState(null);
@@ -51,7 +50,7 @@ export default function Students() {
 
     const openAddModal = () => {
         setEditingStudent(null);
-        setNewStudent({ name: '', email: '', subject: 'Mathematics', hourly_rate: '', avatar_url: null });
+        setNewStudent({ name: '', email: '', subject: '', hourly_rate: '', avatar_url: null });
         setIsCustomSubject(false);
         setCustomSubject('');
         setIsModalOpen(true);
@@ -60,18 +59,10 @@ export default function Students() {
     const openEditModal = (student) => {
         setEditingStudent(student);
 
-        // Check if subject is standard or custom
-        const isStandard = STANDARD_SUBJECTS.includes(student.subject);
-        // Also check if it's in availableSubjects (DB subjects)
-        // If it's in DB subjects, we select it from dropdown.
-        // If it's not in STANDARD and not in DB subjects, it's a "Legacy" custom subject or just custom.
-        // For simplicity, if it's not in STANDARD, we treat it as custom input if not found in DB list?
-        // Actually, if it's in DB list, we just set subject to it.
-        // If it's NOT in DB list and NOT in Standard, we set it as "Other" + custom value.
-
+        // Check if subject is in availableSubjects (DB subjects)
         const inDb = availableSubjects.some(s => s.name === student.subject);
 
-        if (isStandard || inDb) {
+        if (inDb) {
             setNewStudent({
                 name: student.name,
                 email: student.email,
@@ -103,10 +94,9 @@ export default function Students() {
             if (!finalSubject) return; // Don't save if empty custom subject
 
             // Auto-save new subject to DB if it doesn't exist
-            const existsInStandard = STANDARD_SUBJECTS.includes(finalSubject);
             const existsInDb = availableSubjects.some(s => s.name.toLowerCase() === finalSubject.toLowerCase());
 
-            if (!existsInStandard && !existsInDb) {
+            if (!existsInDb) {
                 try {
                     const { data: { user } } = await supabase.auth.getUser();
                     if (user) {
@@ -466,27 +456,39 @@ export default function Students() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
                                     <div className="flex flex-col gap-2">
-                                        <select
-                                            value={newStudent.subject}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val === 'Other') {
-                                                    setIsCustomSubject(true);
-                                                    setNewStudent({ ...newStudent, subject: 'Other' });
-                                                } else {
-                                                    setIsCustomSubject(false);
-                                                    setNewStudent({ ...newStudent, subject: val });
-                                                }
-                                            }}
-                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
-                                        >
-                                            <option value="" disabled>Select a subject</option>
-                                            {/* Combined List */}
-                                            {[...STANDARD_SUBJECTS, ...availableSubjects.map(s => s.name)].filter((v, i, a) => a.indexOf(v) === i).map(sub => (
-                                                <option key={sub} value={sub}>{sub}</option>
-                                            ))}
-                                            <option value="Other">Other (Add new...)</option>
-                                        </select>
+                                        <div className="relative">
+                                            <select
+                                                value={newStudent.subject}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === 'Other') {
+                                                        setIsCustomSubject(true);
+                                                        setNewStudent({ ...newStudent, subject: 'Other' });
+                                                    } else {
+                                                        setIsCustomSubject(false);
+                                                        // Find the selected subject object to get its default hourly rate
+                                                        const selectedSub = availableSubjects.find(s => s.name === val);
+                                                        const defaultRate = selectedSub ? (selectedSub.hourly_rate || 30) : 30;
+
+                                                        setNewStudent({
+                                                            ...newStudent,
+                                                            subject: val,
+                                                            hourly_rate: defaultRate // Auto-inject rate
+                                                        });
+                                                    }
+                                                }}
+                                                className="w-full appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white py-2 px-4 pr-8 rounded-lg leading-tight focus:ring-2 focus:ring-blue-500 outline-none"
+                                            >
+                                                <option value="" disabled>Select a subject</option>
+                                                {availableSubjects.map(s => (
+                                                    <option key={s.id} value={s.name}>{s.name}</option>
+                                                ))}
+                                                <option value="Other">Other (Add new...)</option>
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                                                <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                                            </div>
+                                        </div>
                                         {isCustomSubject && (
                                             <input
                                                 type="text"

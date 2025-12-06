@@ -8,6 +8,7 @@ const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isForgotPassword, setIsForgotPassword] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
     const [alert, setAlert] = useState({ type: '', message: '' });
 
     const showAlert = (type, message) => {
@@ -27,6 +28,34 @@ const Login = () => {
             // Successful login will be handled by App.jsx auth state listener
         } catch (error) {
             showAlert('error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSignUp = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+            if (error) throw error;
+            showAlert('success', 'Check your email for the confirmation link!');
+            setIsSignUp(false);
+        } catch (error) {
+            console.error('Sign up error:', error);
+            // Check for specific database trigger error message if possible, or generic catch
+            // The user requested a specific message for restricted access
+            if (error.message.includes("Database error") || error.status === 500 || error.message) {
+                // We assume any error during sign up in this context might be the restriction
+                // But better to show the actual error if it's specific, or the custom message
+                // The user said: "Registration is restricted to invited students only." if the error occurs.
+                showAlert('error', "Registration is restricted to invited students only.");
+            } else {
+                showAlert('error', error.message);
+            }
         } finally {
             setLoading(false);
         }
@@ -60,8 +89,8 @@ const Login = () => {
             {/* Alert Banner */}
             {alert.message && (
                 <div className={`absolute top-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border transition-all duration-300 animate-in slide-in-from-top-4 fade-in ${alert.type === 'error'
-                        ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                        : 'bg-green-500/10 border-green-500/20 text-green-400'
+                    ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                    : 'bg-green-500/10 border-green-500/20 text-green-400'
                     }`}>
                     {alert.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
                     <span className="font-medium">{alert.message}</span>
@@ -73,16 +102,16 @@ const Login = () => {
                 <div className="flex flex-col items-center mb-8">
                     <Logo className="mb-6 scale-110" />
                     <h2 className="text-2xl font-bold text-white tracking-tight">
-                        {isForgotPassword ? 'Reset Password' : 'Welcome Back'}
+                        {isForgotPassword ? 'Reset Password' : (isSignUp ? 'Create Account' : 'Welcome Back')}
                     </h2>
                     <p className="text-gray-400 text-sm mt-2 text-center">
                         {isForgotPassword
                             ? 'Enter your email to receive a reset link'
-                            : 'Sign in to manage your classes and students'}
+                            : (isSignUp ? 'Sign up to get started' : 'Sign in to manage your classes and students')}
                     </p>
                 </div>
 
-                <form onSubmit={isForgotPassword ? handleResetPassword : handleLogin} className="space-y-6">
+                <form onSubmit={isForgotPassword ? handleResetPassword : (isSignUp ? handleSignUp : handleLogin)} className="space-y-6">
                     <div className="space-y-4">
                         <div className="relative group">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />
@@ -111,7 +140,7 @@ const Login = () => {
                         )}
                     </div>
 
-                    {!isForgotPassword && (
+                    {!isForgotPassword && !isSignUp && (
                         <div className="flex justify-end">
                             <button
                                 type="button"
@@ -132,23 +161,30 @@ const Login = () => {
                             <Loader2 className="animate-spin" size={20} />
                         ) : (
                             <>
-                                {isForgotPassword ? 'Send Reset Link' : 'Sign In'}
+                                {isForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Sign In')}
                                 <ArrowRight size={20} />
                             </>
                         )}
                     </button>
                 </form>
 
-                {isForgotPassword && (
-                    <div className="mt-6 text-center">
+                <div className="mt-6 text-center space-y-2">
+                    {isForgotPassword ? (
                         <button
                             onClick={() => setIsForgotPassword(false)}
                             className="text-sm text-gray-400 hover:text-white transition-colors"
                         >
                             Back to Login
                         </button>
-                    </div>
-                )}
+                    ) : (
+                        <button
+                            onClick={() => setIsSignUp(!isSignUp)}
+                            className="text-sm text-gray-400 hover:text-white transition-colors"
+                        >
+                            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

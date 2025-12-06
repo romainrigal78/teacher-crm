@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Star } from 'lucide-react';
 
 export default function StudentDashboard({ session }) {
     const [student, setStudent] = useState(null);
@@ -9,6 +10,12 @@ export default function StudentDashboard({ session }) {
     const [upcomingClasses, setUpcomingClasses] = useState([]);
     const [unpaidClasses, setUnpaidClasses] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Review State
+    const [existingReview, setExistingReview] = useState(null);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
+    const [hoveredStar, setHoveredStar] = useState(0);
 
     useEffect(() => {
         if (session?.user) {
@@ -60,6 +67,21 @@ export default function StudentDashboard({ session }) {
             if (gradesError) throw gradesError;
             setGrades(gradesData || []);
 
+            // 5. Get Existing Review
+            if (studentData.user_id && studentData.id) {
+                const { data: reviewData, error: reviewError } = await supabase
+                    .from('reviews')
+                    .select('*')
+                    .eq('teacher_id', studentData.user_id)
+                    .eq('student_id', studentData.id)
+                    .maybeSingle();
+
+                if (!reviewError && reviewData) {
+                    setExistingReview(reviewData);
+                    setReviewForm({ rating: reviewData.rating, comment: reviewData.comment || '' });
+                }
+            }
+
         } catch (error) {
             console.error('Error fetching student data:', error);
         } finally {
@@ -103,6 +125,53 @@ export default function StudentDashboard({ session }) {
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();
+    };
+
+    const handleReviewSubmit = async (e) => {
+        e.preventDefault();
+        if (reviewForm.rating === 0) {
+            alert("Please select a rating.");
+            return;
+        }
+
+        if (!student || !student.id) {
+            alert("Student profile not loaded.");
+            return;
+        }
+
+        try {
+            const payload = {
+                teacher_id: student.user_id,
+                student_id: student.id, // Use the student table PK (BigInt)
+                rating: reviewForm.rating,
+                comment: reviewForm.comment
+            };
+
+            let error;
+            if (existingReview) {
+                const { error: updateError } = await supabase
+                    .from('reviews')
+                    .update(payload)
+                    .eq('id', existingReview.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('reviews')
+                    .insert([payload]);
+                error = insertError;
+            }
+
+            if (error) throw error;
+
+            // Refresh data to get the new/updated review
+            fetchStudentData();
+            setIsReviewModalOpen(false);
+            alert("Review submitted successfully!");
+
+        } catch (error) {
+            console.error('Error submitting review:', error);
+            alert('Failed to submit review.');
+        }
     };
 
     if (loading) return <div className="p-8 text-center">Loading dashboard...</div>;
@@ -165,7 +234,7 @@ export default function StudentDashboard({ session }) {
                             )}
                         </div>
 
-                        {/* My Payments (Moved to left column for better balance) */}
+                        {/* My Payments */}
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                                 💳 Payments
@@ -201,6 +270,43 @@ export default function StudentDashboard({ session }) {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Rate My Teacher Card */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                ⭐ Rate my Teacher
+                            </h2>
+                            {existingReview ? (
+                                <div className="text-center py-4">
+                                    <p className="text-gray-600 dark:text-gray-300 mb-2">You rated your teacher:</p>
+                                    <div className="flex justify-center gap-1 mb-4">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <Star
+                                                key={star}
+                                                size={24}
+                                                className={star <= existingReview.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300 dark:text-gray-600"}
+                                            />
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={() => setIsReviewModalOpen(true)}
+                                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                        Edit Review
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Share your experience with your teacher.</p>
+                                    <button
+                                        onClick={() => setIsReviewModalOpen(true)}
+                                        className="w-full py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                                    >
+                                        Leave a Review
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -274,6 +380,68 @@ export default function StudentDashboard({ session }) {
                     </div>
                 </div>
             </div>
+
+            {/* Review Modal */}
+            {isReviewModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-100 dark:border-gray-700">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+                            {existingReview ? 'Edit Review' : 'Rate your Teacher'}
+                        </h2>
+                        <form onSubmit={handleReviewSubmit} className="space-y-6">
+                            <div className="flex flex-col items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rating</label>
+                                <div className="flex gap-2">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                                            onMouseEnter={() => setHoveredStar(star)}
+                                            onMouseLeave={() => setHoveredStar(0)}
+                                            className="focus:outline-none transition-transform hover:scale-110"
+                                        >
+                                            <Star
+                                                size={32}
+                                                className={`${star <= (hoveredStar || reviewForm.rating)
+                                                    ? "fill-yellow-400 text-yellow-400"
+                                                    : "text-gray-300 dark:text-gray-600"
+                                                    } transition-colors`}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comment (Optional)</label>
+                                <textarea
+                                    value={reviewForm.comment}
+                                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none h-32"
+                                    placeholder="Write your feedback here..."
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsReviewModalOpen(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                                >
+                                    Submit Review
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
