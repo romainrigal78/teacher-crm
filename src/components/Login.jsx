@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Mail, Lock, AlertCircle, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, AlertCircle, CheckCircle, ArrowRight, Loader2, User } from 'lucide-react';
 import Logo from './Logo';
 
 const Login = () => {
@@ -9,6 +9,9 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
+    const [role, setRole] = useState('student');
+    const [fullName, setFullName] = useState('');
+    const [username, setUsername] = useState('');
     const [alert, setAlert] = useState({ type: '', message: '' });
 
     const showAlert = (type, message) => {
@@ -37,25 +40,24 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
         try {
+            console.log('Registering with:', { email, password, role, username, fullName });
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
+                options: {
+                    data: {
+                        role: role,
+                        full_name: fullName,
+                        username: username
+                    }
+                }
             });
             if (error) throw error;
             showAlert('success', 'Check your email for the confirmation link!');
             setIsSignUp(false);
         } catch (error) {
             console.error('Sign up error:', error);
-            // Check for specific database trigger error message if possible, or generic catch
-            // The user requested a specific message for restricted access
-            if (error.message.includes("Database error") || error.status === 500 || error.message) {
-                // We assume any error during sign up in this context might be the restriction
-                // But better to show the actual error if it's specific, or the custom message
-                // The user said: "Registration is restricted to invited students only." if the error occurs.
-                showAlert('error', "Registration is restricted to invited students only.");
-            } else {
-                showAlert('error', error.message);
-            }
+            showAlert('error', error.message);
         } finally {
             setLoading(false);
         }
@@ -112,6 +114,52 @@ const Login = () => {
                 </div>
 
                 <form onSubmit={isForgotPassword ? handleResetPassword : (isSignUp ? handleSignUp : handleLogin)} className="space-y-6">
+                    {isSignUp && (
+                        <div className="flex bg-gray-950/50 p-1 rounded-xl border border-gray-800">
+                            <button
+                                type="button"
+                                onClick={() => setRole('student')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${role === 'student' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                I am a Student
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRole('teacher')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${role === 'teacher' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                I am a Teacher
+                            </button>
+                        </div>
+                    )}
+
+                    {isSignUp && (
+                        <div className="space-y-4">
+                            <div className="relative group">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+                                <input
+                                    type="text"
+                                    placeholder="Full Name"
+                                    value={fullName}
+                                    onChange={(e) => setFullName(e.target.value)}
+                                    className="w-full bg-gray-950/50 border border-gray-800 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-gray-600"
+                                    required
+                                />
+                            </div>
+                            <div className="relative group">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+                                <input
+                                    type="text"
+                                    placeholder="Username"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full bg-gray-950/50 border border-gray-800 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-gray-600"
+                                    required
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         <div className="relative group">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />

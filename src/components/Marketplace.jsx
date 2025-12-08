@@ -11,12 +11,28 @@ export default function Marketplace() {
     const [cityFilter, setCityFilter] = useState('');
     const [contactModalOpen, setContactModalOpen] = useState(false);
     const [selectedTeacher, setSelectedTeacher] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [userRole, setUserRole] = useState(null);
 
     const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology", "Piano", "Coach Sportif"];
 
     useEffect(() => {
         fetchProfiles();
+        checkUser();
     }, []);
+
+    const checkUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+        if (user) {
+            const { data } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+            setUserRole(data?.role || 'student');
+        }
+    };
 
     const fetchProfiles = async () => {
         console.log("Fetching profiles..."); // Debug 1
@@ -376,6 +392,20 @@ export default function Marketplace() {
                             >
                                 Close
                             </button>
+                            {/* Conditional Booking Button */}
+                            {!currentUser ? (
+                                <Link to="/login" className="ml-3 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                    Log in to Book
+                                </Link>
+                            ) : userRole === 'student' ? (
+                                <button
+                                    onClick={() => alert("Booking flow coming soon!")}
+                                    className="ml-3 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                                >
+                                    <BookOpen size={18} />
+                                    Book Lesson
+                                </button>
+                            ) : null}
                         </div>
                     </div>
                 </div>
