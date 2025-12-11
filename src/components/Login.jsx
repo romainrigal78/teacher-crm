@@ -22,17 +22,36 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-            if (error) throw error;
-            // Successful login will be handled by App.jsx auth state listener
-        } catch (error) {
+
+        // 1. Sign In
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (error) {
             showAlert('error', error.message);
-        } finally {
             setLoading(false);
+            return;
+        }
+
+        if (data?.user) {
+            // 2. Get Role
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', data.user.id)
+                .single();
+
+            // 3. Force Redirect
+            const role = profile?.role;
+            if (role === 'admin') {
+                window.location.href = '/admin';
+            } else if (role === 'student') {
+                window.location.href = '/';
+            } else {
+                window.location.href = '/';
+            }
         }
     };
 

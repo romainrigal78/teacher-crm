@@ -14,6 +14,8 @@ import Marketplace from './components/Marketplace'
 import Paywall from './components/Paywall'
 import PaymentSuccess from './components/PaymentSuccess'
 import Grades from './components/Grades'
+import AdminDashboard from './components/AdminDashboard'
+import { Shield } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -117,6 +119,8 @@ function App() {
 
       if (data?.role === 'student') {
         setUserRole('student')
+      } else if (data?.role === 'admin') {
+        setUserRole('admin')
       } else {
         setUserRole('teacher')
       }
@@ -166,7 +170,17 @@ function App() {
           <Route path="/settings" element={<Settings onAvatarUpdate={setUserAvatarUrl} />} />
           <Route path="/search" element={<Marketplace />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
+        {userRole === 'admin' && (
+          <a
+            href="/admin"
+            className="fixed bottom-4 right-4 p-3 bg-gray-900 text-white rounded-full shadow-lg opacity-50 hover:opacity-100 transition-opacity z-50"
+            title="Admin Mode"
+          >
+            <Shield size={24} />
+          </a>
+        )}
       </Layout>
     </BrowserRouter>
   )

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Shield } from 'lucide-react';
 import AvatarUpload from './AvatarUpload';
 import CityAutocomplete from './CityAutocomplete';
 
@@ -22,6 +22,7 @@ const Settings = ({ onAvatarUpdate }) => {
     const [showEmail, setShowEmail] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
+    const [role, setRole] = useState(null);
     const [message, setMessage] = useState(null);
 
     const [currentPassword, setCurrentPassword] = useState('');
@@ -143,7 +144,9 @@ const Settings = ({ onAvatarUpdate }) => {
                     setPhone(data.phone || '');
                     setShowEmail(data.show_email || false);
                     setShowPhone(data.show_phone || false);
+                    setShowPhone(data.show_phone || false);
                     setIsPublic(data.is_public || false);
+                    setRole(data.role);
 
                     // Handle Subject Logic
                     // We combine standard and custom subjects for the check
@@ -595,6 +598,19 @@ const Settings = ({ onAvatarUpdate }) => {
                     </div>
                 )
             }
+            {/* Admin Entry Point */}
+            {role === 'admin' && (
+                <div className="mt-8 flex justify-center">
+                    <a
+                        href="/admin"
+                        className="flex items-center gap-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-50 hover:opacity-100"
+                        title="Admin Dashboard"
+                    >
+                        <Shield size={20} />
+                        <span className="text-sm font-medium">Admin Panel</span>
+                    </a>
+                </div>
+            )}
         </div >
     );
 };
