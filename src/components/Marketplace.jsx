@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Search, MapPin, Mail, BookOpen, User, Star } from 'lucide-react';
+import { Search, MapPin, Mail, BookOpen, User, Star, Calendar, Clock, CheckCircle, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CityAutocomplete from './CityAutocomplete';
 
@@ -13,6 +13,13 @@ export default function Marketplace() {
     const [selectedTeacher, setSelectedTeacher] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [userRole, setUserRole] = useState(null);
+
+    // Booking State
+    const [isBookingMode, setIsBookingMode] = useState(false);
+    const [bookingDate, setBookingDate] = useState('');
+    const [bookingTime, setBookingTime] = useState('');
+    const [bookingStatus, setBookingStatus] = useState('idle'); // idle, loading, success, error
+    const [bookingError, setBookingError] = useState('');
 
     const STANDARD_SUBJECTS = ["Mathematics", "English", "Physics", "Marketing", "Management", "Law", "Technology", "Piano", "Coach Sportif"];
 
@@ -107,6 +114,46 @@ export default function Marketplace() {
 
         return matchesSubject && matchesCity;
     });
+
+    const handleBookLesson = async () => {
+        if (!bookingDate || !bookingTime) {
+            setBookingError("Please select both a date and time.");
+            return;
+        }
+
+        setBookingStatus('loading');
+        setBookingError('');
+
+        try {
+            // Combine date and time into a timestamp
+            const scheduledAt = new Date(`${bookingDate}T${bookingTime}:00`).toISOString();
+
+            const { error } = await supabase
+                .from('bookings')
+                .insert({
+                    student_id: currentUser.id,
+                    teacher_id: selectedTeacher.id,
+                    scheduled_at: scheduledAt,
+                    status: 'pending',
+                    price: 30 // Default price for now
+                });
+
+            if (error) throw error;
+
+            setBookingStatus('success');
+            setTimeout(() => {
+                setContactModalOpen(false);
+                setIsBookingMode(false);
+                setBookingStatus('idle');
+                setBookingDate('');
+                setBookingTime('');
+            }, 2000);
+        } catch (error) {
+            console.error("Booking error:", error);
+            setBookingError(error.message);
+            setBookingStatus('error');
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -399,7 +446,7 @@ export default function Marketplace() {
                                 </Link>
                             ) : userRole === 'student' ? (
                                 <button
-                                    onClick={() => alert("Booking flow coming soon!")}
+                                    onClick={() => setIsBookingMode(true)}
                                     className="ml-3 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
                                 >
                                     <BookOpen size={18} />
@@ -407,6 +454,90 @@ export default function Marketplace() {
                                 </button>
                             ) : null}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Booking Modal Overlay */}
+            {contactModalOpen && isBookingMode && selectedTeacher && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-700 relative animate-in fade-in zoom-in duration-200 flex flex-col">
+                        <div className="p-6">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Book a Lesson</h3>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+                                Schedule a session with <span className="font-semibold text-blue-600 dark:text-blue-400">{selectedTeacher.full_name}</span>.
+                            </p>
+
+                            {bookingStatus === 'success' ? (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+                                        <CheckCircle size={32} className="text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Booking Confirmed!</h4>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm">Your request has been sent to the teacher.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                            <input
+                                                type="date"
+                                                value={bookingDate}
+                                                onChange={(e) => setBookingDate(e.target.value)}
+                                                min={new Date().toISOString().split('T')[0]}
+                                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
+                                        <div className="relative">
+                                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                            <input
+                                                type="time"
+                                                value={bookingTime}
+                                                onChange={(e) => setBookingTime(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {bookingError && (
+                                        <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
+                                            <span className="font-bold">Error:</span> {bookingError}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {bookingStatus !== 'success' && (
+                            <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl flex justify-end gap-3">
+                                <button
+                                    onClick={() => setIsBookingMode(false)}
+                                    disabled={bookingStatus === 'loading'}
+                                    className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleBookLesson}
+                                    disabled={bookingStatus === 'loading'}
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    {bookingStatus === 'loading' ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            Booking...
+                                        </>
+                                    ) : (
+                                        'Confirm Booking'
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

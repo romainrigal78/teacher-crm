@@ -16,6 +16,7 @@ export default function StudentDashboard({ session }) {
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
     const [hoveredStar, setHoveredStar] = useState(0);
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         if (session?.user) {
@@ -25,37 +26,113 @@ export default function StudentDashboard({ session }) {
 
     const fetchStudentData = async () => {
         try {
-            // 1. Get Student Details linked to this Auth User
+            // 1. Get Student Details linked to this Auth User (from profiles)
             const { data: studentData, error: studentError } = await supabase
-                .from('students')
+                .from('profiles')
                 .select('*')
-                .eq('auth_user_id', session.user.id)
-                .single();
+                .eq('id', session.user.id)
+                .maybeSingle(); // Use maybeSingle to avoid PGRST116 crash
 
             if (studentError) throw studentError;
-            setStudent(studentData);
 
-            // 2. Get Upcoming Classes
-            const today = new Date().toISOString().split('T')[0];
-            const { data: classesData, error: classesError } = await supabase
-                .from('classes')
-                .select('*')
-                .eq('student_id', studentData.id)
-                .gte('date', today)
-                .order('date', { ascending: true });
+            if (!studentData) {
+                console.warn("No profile found for user:", session.user.id);
+                setLoading(false);
+                return;
+            }
 
-            if (classesError) throw classesError;
-            setUpcomingClasses(classesData);
+            // Map profile data to expected student structure
+            const mappedStudent = {
+                ...studentData,
+                name: studentData.full_name, // Map full_name to name
+                // Add default values for missing fields if needed
+                hourly_rate: 30 // Default rate since profiles might not have it yet
+            };
 
-            // 3. Get Unpaid Classes for Invoices
-            const { data: unpaidData, error: unpaidError } = await supabase
-                .from('classes')
-                .select('*')
-                .eq('student_id', studentData.id)
-                .eq('paid', false);
+            setStudent(mappedStudent);
 
-            if (unpaidError) throw unpaidError;
-            setUnpaidClasses(unpaidData);
+            // 2. Get Upcoming Classes (from bookings)
+            const today = new Date().toISOString();
+            let bookingsData = [];
+
+            try {
+                const { data, error: bookingsError } = await supabase
+                    .from('bookings')
+                    .select('*, teacher:profiles!teacher_id(full_name)')
+                    .eq('student_id', studentData.id)
+                    .gte('scheduled_at', today)
+                    .order('scheduled_at', { ascending: true });
+
+                if (bookingsError) {
+                    if (bookingsError.code === 'PGRST205') {
+                        console.warn('API Schema out of sync, bookings table not found. Waiting for refresh.');
+                        bookingsData = [];
+                    } else {
+                        throw bookingsError;
+                    }
+                } else {
+                    bookingsData = data;
+                }
+            } catch (err) {
+                if (err.code === 'PGRST205') {
+                    console.warn('API Schema out of sync, bookings table not found. Waiting for refresh.');
+                    bookingsData = [];
+                } else {
+                    throw err;
+                }
+            }
+
+            // Map bookings to UI structure
+            const mappedClasses = bookingsData.map(booking => {
+                const dateObj = new Date(booking.scheduled_at);
+                return {
+                    id: booking.id,
+                    title: `Lesson with ${booking.teacher?.full_name || 'Teacher'}`,
+                    date: dateObj.toISOString().split('T')[0],
+                    time: dateObj.toTimeString().slice(0, 5),
+                    paid: booking.status === 'confirmed' // Assuming confirmed means paid/valid for now
+                };
+            });
+            setUpcomingClasses(mappedClasses);
+
+            // 3. Get Unpaid Classes for Invoices (Pending bookings)
+            let unpaidData = [];
+            try {
+                const { data, error: unpaidError } = await supabase
+                    .from('bookings')
+                    .select('*, teacher:profiles!teacher_id(full_name)')
+                    .eq('student_id', studentData.id)
+                    .eq('status', 'pending'); // Assuming pending means unpaid
+
+                if (unpaidError) {
+                    if (unpaidError.code === 'PGRST205') {
+                        // Ignore missing table error
+                        unpaidData = [];
+                    } else {
+                        throw unpaidError;
+                    }
+                } else {
+                    unpaidData = data;
+                }
+            } catch (err) {
+                if (err.code === 'PGRST205') {
+                    unpaidData = [];
+                } else {
+                    throw err;
+                }
+            }
+
+            const mappedUnpaid = unpaidData.map(booking => {
+                const dateObj = new Date(booking.scheduled_at);
+                return {
+                    id: booking.id,
+                    title: `Lesson with ${booking.teacher?.full_name || 'Teacher'}`,
+                    date: dateObj.toISOString().split('T')[0],
+                    time: dateObj.toTimeString().slice(0, 5),
+                    price: booking.price
+                };
+            });
+            setUnpaidClasses(mappedUnpaid);
 
             // 4. Get Grades
             const { data: gradesData, error: gradesError } = await supabase
@@ -129,20 +206,53 @@ export default function StudentDashboard({ session }) {
 
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
+        setErrorMessage('');
+
         if (reviewForm.rating === 0) {
-            alert("Please select a rating.");
+            setErrorMessage("Please select a rating.");
             return;
         }
 
         if (!student || !student.id) {
-            alert("Student profile not loaded.");
+            setErrorMessage("Student profile not loaded.");
             return;
         }
 
         try {
+            // We need the teacher_id. In the old code it was student.user_id (which was wrong).
+            // We should get it from the last booking or a specific booking.
+            // For now, let's try to find a teacher from the upcoming or unpaid classes, 
+            // or if we have an existing review, use that teacher_id.
+
+            let teacherId = existingReview?.teacher_id;
+
+            if (!teacherId) {
+                // Try to find a teacher from bookings
+                if (upcomingClasses.length > 0) {
+                    // This is a bit hacky, but we need a teacher ID. 
+                    // Ideally the UI should let you review a specific teacher.
+                    // For this fix, we'll assume the student has one main teacher or we pick the first one found.
+                    // We need to fetch the raw booking to get the teacher_id, but we mapped it away.
+                    // Let's re-fetch a booking to get a valid teacher_id if we don't have one.
+                    const { data: booking } = await supabase
+                        .from('bookings')
+                        .select('teacher_id')
+                        .eq('student_id', student.id)
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (booking) teacherId = booking.teacher_id;
+                }
+            }
+
+            if (!teacherId) {
+                setErrorMessage("No teacher found to review. You need to book a lesson first.");
+                return;
+            }
+
             const payload = {
-                teacher_id: student.user_id,
-                student_id: student.id, // Use the student table PK (BigInt)
+                teacher_id: teacherId,
+                student_id: student.id,
                 rating: reviewForm.rating,
                 comment: reviewForm.comment
             };
@@ -166,11 +276,11 @@ export default function StudentDashboard({ session }) {
             // Refresh data to get the new/updated review
             fetchStudentData();
             setIsReviewModalOpen(false);
-            alert("Review submitted successfully!");
+            // alert("Review submitted successfully!"); // Removed alert
 
         } catch (error) {
             console.error('Error submitting review:', error);
-            alert('Failed to submit review.');
+            setErrorMessage(error.message || 'Failed to submit review.');
         }
     };
 
@@ -388,6 +498,11 @@ export default function StudentDashboard({ session }) {
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
                             {existingReview ? 'Edit Review' : 'Rate your Teacher'}
                         </h2>
+                        {errorMessage && (
+                            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg border border-red-100 dark:border-red-800">
+                                {errorMessage}
+                            </div>
+                        )}
                         <form onSubmit={handleReviewSubmit} className="space-y-6">
                             <div className="flex flex-col items-center gap-2">
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rating</label>

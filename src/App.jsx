@@ -108,14 +108,14 @@ function App() {
 
   const checkUserRole = async (userId) => {
     try {
-      // Check if this user is linked to a student record
+      // Correctly check role from profiles table
       const { data, error } = await supabase
-        .from('students')
-        .select('id')
-        .eq('auth_user_id', userId)
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
         .maybeSingle()
 
-      if (data) {
+      if (data?.role === 'student') {
         setUserRole('student')
       } else {
         setUserRole('teacher')
