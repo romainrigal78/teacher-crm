@@ -39,7 +39,7 @@ const Grades = () => {
             const { data, error } = await supabase
                 .from('subjects')
                 .select('name')
-                .eq('user_id', user.id)
+                .eq('teacher_id', user.id)
                 .order('name');
 
             if (error) throw error;

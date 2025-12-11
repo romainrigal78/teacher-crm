@@ -45,9 +45,13 @@ const Settings = ({ onAvatarUpdate }) => {
 
     const fetchSubjects = async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
             const { data, error } = await supabase
                 .from('subjects')
                 .select('*')
+                .eq('teacher_id', user.id)
                 .order('name');
             if (error) throw error;
             setAvailableSubjects(data || []);
@@ -61,7 +65,7 @@ const Settings = ({ onAvatarUpdate }) => {
         try {
             const { data, error } = await supabase
                 .from('subjects')
-                .insert([{ user_id: user.id, name: newSubjectInput.trim() }])
+                .insert([{ teacher_id: user.id, user_id: user.id, name: newSubjectInput.trim() }])
                 .select()
                 .single();
 

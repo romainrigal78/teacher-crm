@@ -27,9 +27,13 @@ export default function Students() {
     }, []);
 
     const fetchSubjects = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         const { data, error } = await supabase
             .from('subjects')
             .select('*')
+            .eq('teacher_id', user.id)
             .order('name');
         if (!error) {
             setAvailableSubjects(data || []);
@@ -102,7 +106,7 @@ export default function Students() {
                     if (user) {
                         const { data: newSub, error: subError } = await supabase
                             .from('subjects')
-                            .insert([{ user_id: user.id, name: finalSubject }])
+                            .insert([{ teacher_id: user.id, user_id: user.id, name: finalSubject }])
                             .select()
                             .single();
 
